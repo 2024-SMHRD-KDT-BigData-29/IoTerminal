@@ -94,7 +94,7 @@ const WorkflowCanvasPage = () => {
     };
 
     return (
-        <div className="h-full flex flex-col">
+        <div className="h-[calc(100vh-80px)] min-h-[600px] flex flex-col">
             {/* 상단 툴바 */}
             <div className="bg-white dark:bg-[#3a2e5a] shadow-sm p-4 flex items-center justify-between">
                 <div className="flex items-center space-x-4">
@@ -131,14 +131,14 @@ const WorkflowCanvasPage = () => {
             </div>
 
             {/* 메인 콘텐츠 영역 */}
-            <div className="flex-1 flex overflow-hidden">
+            <div className="flex-1 flex overflow-hidden min-h-0">
                 {/* 왼쪽 노드 팔레트 */}
                 <div className="w-60 bg-white dark:bg-[#3a2e5a] shadow-sm border-r border-[#d1c4e9] dark:border-[#9575cd] overflow-y-auto">
                     <NodePalette />
                 </div>
 
                 {/* 중앙 캔버스 */}
-                <div className="flex-1 bg-[#f8f6fc] dark:bg-[#2a2139] relative">
+                <div className="flex-1 bg-[#f8f6fc] dark:bg-[#2a2139] relative min-h-0">
                     <WorkflowCanvas 
                         elements={elements} 
                         setElements={setElements}

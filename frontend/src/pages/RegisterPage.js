@@ -98,13 +98,8 @@ const RegisterPage = () => {
             <div className="max-w-md w-full space-y-8 bg-white dark:bg-[#3a2e5a] p-8 rounded-2xl shadow-xl">
                 <div className="text-center">
                     <Link to="/" className="inline-block">
-                        <svg className="h-12 w-auto text-[#b39ddb] dark:text-[#b39ddb] mx-auto" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
-                        </svg>
+                        <span className="text-3xl font-extrabold text-[#7e57c2] dark:text-[#b39ddb] tracking-tight select-none">IoTerminal</span>
                     </Link>
-                    <h2 className="mt-6 text-3xl font-bold text-[#3a2e5a] dark:text-[#b39ddb]">
-                        IoT 허브 회원가입
-                    </h2>
                     <p className="mt-2 text-sm text-[#9575cd] dark:text-[#b39ddb]">
                         이미 계정이 있으신가요?{' '}
                         <Link to="/login" className="font-medium text-[#7e57c2] dark:text-[#9575cd] hover:text-[#5e35b1] dark:hover:text-[#b39ddb]">
@@ -290,7 +285,7 @@ const RegisterPage = () => {
                         type="submit"
                         className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-[#7e57c2] dark:bg-[#9575cd] hover:bg-[#5e35b1] dark:hover:bg-[#b39ddb] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#7e57c2] dark:focus:ring-[#9575cd] transition-colors duration-200"
                     >
-                        회원가입
+                        IoTerminal 회원가입
                     </button>
                 </form>
             </div>

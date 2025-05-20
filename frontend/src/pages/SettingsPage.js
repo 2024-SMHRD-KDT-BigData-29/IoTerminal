@@ -7,7 +7,7 @@ const SettingsPage = () => {
         <div>
             <div className="flex items-center space-x-3 mb-6 border-b pb-4">
                 <Settings size={32} className="text-gray-600" />
-                <h2 className="text-2xl font-semibold text-gray-800">System Settings</h2>
+                <h2 className="text-2xl font-semibold text-gray-800 dark:text-[#b39ddb] mb-6">설정</h2>
             </div>
             <div className="bg-white p-8 rounded-xl shadow-lg">
                 <p className="text-gray-700">

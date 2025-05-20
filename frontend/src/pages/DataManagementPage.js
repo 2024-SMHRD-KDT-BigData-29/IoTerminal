@@ -8,7 +8,8 @@ const DataManagementPage = () => {
         <div>
             <div className="flex items-center space-x-3 mb-6 border-b pb-4">
                 <Database size={32} className="text-blue-600" />
-                <h2 className="text-2xl font-semibold text-gray-800">데이터 관리</h2>
+                <h2 className="text-2xl font-semibold text-gray-800 dark:text-[#b39ddb]">데이터 관리</h2>
+
             </div>
             <div className="bg-white p-8 rounded-xl shadow-lg">
                 <p className="text-gray-700">
