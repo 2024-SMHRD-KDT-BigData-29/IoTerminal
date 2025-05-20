@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Plus, Save, Trash2, Upload } from 'lucide-react';
 import WorkflowCanvas from '../components/workflow/WorkflowCanvas';
@@ -12,6 +12,7 @@ const WorkflowCanvasPage = () => {
     const [showImportModal, setShowImportModal] = useState(false);
     const navigate = useNavigate();
     const { workflowId } = useParams();
+    const cyRef = useRef(null);
 
     const handleSaveWorkflow = async () => {
         // TODO: API 호출하여 워크플로우 저장
@@ -44,6 +45,51 @@ const WorkflowCanvasPage = () => {
                 }
             };
             reader.readAsText(file);
+        }
+    };
+
+    const handleCyInit = (cy) => {
+        cyRef.current = cy;
+        
+        // 노드 클릭 이벤트 처리
+        cy.on('tap', 'node', (evt) => {
+            const node = evt.target;
+            setSelectedNode({
+                id: node.id(),
+                data: node.data()
+            });
+        });
+
+        // 캔버스 클릭 시 선택 해제
+        cy.on('tap', (evt) => {
+            if (evt.target === cy) {
+                setSelectedNode(null);
+            }
+        });
+    };
+
+    const handleUpdateNode = (nodeId, updatedProps) => {
+        setElements(currentElements =>
+            currentElements.map(el => {
+                if (el.data.id === nodeId) {
+                    return {
+                        ...el,
+                        data: {
+                            ...el.data,
+                            ...updatedProps
+                        }
+                    };
+                }
+                return el;
+            })
+        );
+
+        // Cytoscape 그래프 업데이트
+        if (cyRef.current) {
+            const node = cyRef.current.getElementById(nodeId);
+            if (node.length > 0) {
+                node.data(updatedProps);
+            }
         }
     };
 
@@ -96,8 +142,8 @@ const WorkflowCanvasPage = () => {
                     <WorkflowCanvas 
                         elements={elements} 
                         setElements={setElements}
-                        selectedNode={selectedNode}
-                        setSelectedNode={setSelectedNode}
+                        onCyInit={handleCyInit}
+                        selectedNodeId={selectedNode?.id}
                     />
                 </div>
 
@@ -105,16 +151,7 @@ const WorkflowCanvasPage = () => {
                 <div className="w-72 bg-white dark:bg-[#3a2e5a] shadow-sm border-l border-[#d1c4e9] dark:border-[#9575cd] overflow-y-auto">
                     <PropertyEditor 
                         selectedNode={selectedNode}
-                        onUpdateNode={(nodeId, updatedProps) => {
-                            setElements(currentElements =>
-                                currentElements.map(el => {
-                                    if (el.id === nodeId) {
-                                        return { ...el, ...updatedProps };
-                                    }
-                                    return el;
-                                })
-                            );
-                        }}
+                        onUpdateNode={handleUpdateNode}
                     />
                 </div>
             </div>

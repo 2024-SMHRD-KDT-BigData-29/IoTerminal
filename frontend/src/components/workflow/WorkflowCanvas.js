@@ -108,7 +108,19 @@ const baseStylesheet = [
         'line-style': 'dashed',
         'width': 3,
         'z-index': 9999
-    }}
+    }},
+    { selector: 'edge:selected', style: {
+        'line-color': '#7e57c2',
+        'target-arrow-color': '#7e57c2',
+        'width': 6,
+        'opacity': 1,
+        'z-index': 9999,
+        'shadow-blur': 8,
+        'shadow-color': '#7e57c2',
+        'shadow-opacity': 0.5,
+        'shadow-offset-x': 0,
+        'shadow-offset-y': 0,
+    } },
 ];
 
 function WorkflowCanvas({ elements, setElements, onCyInit, selectedNodeId }) {
@@ -123,7 +135,6 @@ function WorkflowCanvas({ elements, setElements, onCyInit, selectedNodeId }) {
             cyRef.current = cyInstance;
             if (onCyInit && typeof onCyInit === 'function') {
                 onCyInit(cyInstance);
-                cyInstance.isCyInitDoneFlag = true;
             }
         } else if (!cyInstance && cyRef.current) {
             cyRef.current = null;
@@ -133,11 +144,8 @@ function WorkflowCanvas({ elements, setElements, onCyInit, selectedNodeId }) {
     useEffect(() => {
         const cy = cyRef.current;
         const container = canvasContainerRef.current;
-        if (!cy) return;
-        if (!container) return;
+        if (!cy || !container) return;
 
-        console.log('Cytoscape instance initialized:', cy);
-        
         // 기본 설정
         cy.autoungrabify(false);
         cy.panningEnabled(true);
@@ -148,13 +156,16 @@ function WorkflowCanvas({ elements, setElements, onCyInit, selectedNodeId }) {
             event.preventDefault();
             event.dataTransfer.dropEffect = 'move';
         };
+
         const handleDrop = (event) => {
             event.preventDefault();
             const type = event.dataTransfer.getData('application/reactflow-nodetype');
             let label = event.dataTransfer.getData('application/reactflow-nodelabel');
             const nodeConfigString = event.dataTransfer.getData('application/reactflow-nodeconfig');
             let nodeConfig = {};
+            
             if (!type) return;
+            
             try {
                 if (nodeConfigString) {
                     nodeConfig = JSON.parse(nodeConfigString);
@@ -162,12 +173,15 @@ function WorkflowCanvas({ elements, setElements, onCyInit, selectedNodeId }) {
             } catch (e) {
                 console.error("Error parsing nodeConfig from drag event:", e);
             }
+            
             if (!label) label = type;
+            
             const bounds = container.getBoundingClientRect();
             const pan = cy.pan();
             const zoom = cy.zoom();
             const modelX = (event.clientX - bounds.left - pan.x) / zoom;
             const modelY = (event.clientY - bounds.top - pan.y) / zoom;
+            
             const newNode = {
                 group: 'nodes',
                 data: {
@@ -178,17 +192,36 @@ function WorkflowCanvas({ elements, setElements, onCyInit, selectedNodeId }) {
                 },
                 position: { x: modelX, y: modelY }
             };
-            console.log('Adding new node:', newNode);
+            
             setElements(prevElements => [...prevElements, newNode]);
         };
+
         container.addEventListener('dragover', handleDragOver);
         container.addEventListener('drop', handleDrop);
+
         return () => {
             container.removeEventListener('dragover', handleDragOver);
             container.removeEventListener('drop', handleDrop);
         };
     }, [setElements]);
 
+    // 선택된 노드 하이라이트 효과
+    useEffect(() => {
+        const cy = cyRef.current;
+        if (!cy) return;
+
+        if (selectedNodeId) {
+            cy.elements().removeClass('selected');
+            const selectedNode = cy.getElementById(selectedNodeId);
+            if (selectedNode.length > 0) {
+                selectedNode.addClass('selected');
+            }
+        } else {
+            cy.elements().removeClass('selected');
+        }
+    }, [selectedNodeId]);
+
+    // 엣지 연결 모드 및 삭제 기능
     useEffect(() => {
         const cy = cyRef.current;
         if (!cy) return;
@@ -196,7 +229,6 @@ function WorkflowCanvas({ elements, setElements, onCyInit, selectedNodeId }) {
         function handleNodeClick(evt) {
             const node = evt.target;
             if (!node.isNode()) return;
-            console.log('Node clicked:', node.id(), 'Current source node:', sourceNodeRef.current?.id());
             if (!sourceNodeRef.current) {
                 // 첫 번째 노드 선택
                 sourceNodeRef.current = node;
@@ -240,68 +272,32 @@ function WorkflowCanvas({ elements, setElements, onCyInit, selectedNodeId }) {
             }
         }
 
-        function handleMouseMove(evt) {
-            if (sourceNodeRef.current && evt.cyRenderedPosition) {
-                const pos = evt.cyRenderedPosition;
-                if (previewEdgeRef.current) {
-                    previewEdgeRef.current.remove();
-                    previewEdgeRef.current = null;
-                }
-                // 미리보기 엣지 생성
-                previewEdgeRef.current = cy.add({
-                    group: 'edges',
-                    data: {
-                        id: 'preview-edge',
-                        source: sourceNodeRef.current.id(),
-                        target: { x: pos.x, y: pos.y }
-                    },
-                    style: {
-                        'line-color': '#7e57c2',
-                        'target-arrow-color': '#7e57c2',
-                        'target-arrow-shape': 'triangle',
-                        'opacity': 0.7,
-                        'line-style': 'dashed',
-                        'width': 3
-                    }
-                });
-            }
-        }
-
         if (isEdgeMode) {
             cy.on('tap', 'node', handleNodeClick);
-            cy.on('mousemove', handleMouseMove);
         }
         return () => {
             cy.removeListener('tap', 'node', handleNodeClick);
-            cy.removeListener('mousemove', handleMouseMove);
-            if (previewEdgeRef.current) {
-                previewEdgeRef.current.remove();
-                previewEdgeRef.current = null;
-            }
-            if (sourceNodeRef.current) {
-                sourceNodeRef.current.style('border-width', 2);
-                sourceNodeRef.current.style('border-color', '#9575cd');
-                sourceNodeRef.current.style('border-style', 'solid');
-                sourceNodeRef.current = null;
-            }
         };
     }, [isEdgeMode, setElements]);
 
+    // 렌더링 시 유효한 엣지만 전달
+    const nodeIds = elements.filter(el => el.group === 'nodes').map(el => el.data.id);
+    const validElements = elements.filter(el => {
+        if (el.group === 'edges') {
+            return nodeIds.includes(el.data.source) && nodeIds.includes(el.data.target);
+        }
+        return true;
+    });
+
     return (
-        <div className="h-full w-full bg-purple-50 relative flex items-center justify-center rounded-2xl shadow-xl transition-all duration-300">
-            <div 
-                ref={canvasContainerRef} 
-                className="h-full w-full max-w-[1600px] rounded-2xl shadow-lg border border-purple-100"
-                style={{ touchAction: 'none' }}
-            >
-                <CytoscapeComponent
-                    elements={CytoscapeComponent.normalizeElements(elements)}
-                    className="h-full w-full rounded-2xl"
-                    stylesheet={baseStylesheet}
-                    cy={cyCallbackRef}
-                    layout={{ name: 'preset' }} 
-                />
-            </div>
+        <div ref={canvasContainerRef} className="w-full h-full relative">
+            <CytoscapeComponent
+                elements={validElements}
+                style={{ width: '100%', height: '100%' }}
+                stylesheet={baseStylesheet}
+                cy={cyCallbackRef}
+            />
+            {/* 오른쪽 상단 버튼들 */}
             <div className="absolute top-4 right-4 flex gap-2 z-10">
                 <button
                     onClick={() => {
@@ -325,7 +321,15 @@ function WorkflowCanvas({ elements, setElements, onCyInit, selectedNodeId }) {
                         if (selectedElements && selectedElements.length > 0) {
                             const selectedIds = selectedElements.map(ele => ele.id());
                             setElements(prevElements => 
-                                prevElements.filter(el => !selectedIds.includes(el.data.id))
+                                prevElements.filter(el => {
+                                    // 노드: 선택된 id가 아니면 남김
+                                    if (el.group === 'nodes') return !selectedIds.includes(el.data.id);
+                                    // 엣지: source/target이 삭제된 노드가 아니면 남김
+                                    if (el.group === 'edges') {
+                                        return !selectedIds.includes(el.data.source) && !selectedIds.includes(el.data.target);
+                                    }
+                                    return true;
+                                })
                             );
                             selectedElements.remove();
                         }
