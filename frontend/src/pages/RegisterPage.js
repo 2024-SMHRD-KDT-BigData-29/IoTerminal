@@ -59,6 +59,7 @@ const RegisterPage = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [error, setError] = useState('');
+    const [passwordMatchError, setPasswordMatchError] = useState('');
     const navigate = useNavigate();
 
     const handleChange = (e) => {
@@ -67,6 +68,21 @@ const RegisterPage = () => {
             ...prev,
             [name]: value
         }));
+        if ((name === 'password' || name === 'confirmPassword')) {
+            if (name === 'password') {
+                if (value !== formData.confirmPassword) {
+                    setPasswordMatchError('비밀번호와 비밀번호 확인이 일치하지 않습니다.');
+                } else {
+                    setPasswordMatchError('');
+                }
+            } else if (name === 'confirmPassword') {
+                if (formData.password !== value) {
+                    setPasswordMatchError('비밀번호와 비밀번호 확인이 일치하지 않습니다.');
+                } else {
+                    setPasswordMatchError('');
+                }
+            }
+        }
     };
 
     const handleDateChange = (date) => {
@@ -112,6 +128,11 @@ const RegisterPage = () => {
                     {error && (
                         <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-3 rounded-xl text-sm">
                             {error}
+                        </div>
+                    )}
+                    {passwordMatchError && (
+                        <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-3 rounded-xl text-sm">
+                            {passwordMatchError}
                         </div>
                     )}
 
