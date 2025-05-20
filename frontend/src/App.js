@@ -31,8 +31,8 @@ function App() {
                     <Route path="/dashboard" element={<DashboardPage />} />
                     <Route path="/workflow" element={<WorkflowPage />} />
                     <Route path="/workflow/:workflowId" element={<WorkflowPage />} />
-                    <Route path="/data" element={<DataManagementPage />} />
                     <Route path="/iot-devices" element={<IotDevicesPage />} />
+                    <Route path="/iot-devices/data" element={<DataManagementPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                 </Route>
 

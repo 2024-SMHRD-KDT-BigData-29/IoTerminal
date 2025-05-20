@@ -19,24 +19,60 @@ import {
 } from 'lucide-react';
 import { getCurrentUserData, logout } from '../services/authService';
 
-const SidebarMenuItem = ({ path, icon, text, active = false, collapsed = false }) => {
+const SidebarMenuItem = ({ path, icon, text, active = false, collapsed = false, submenu = [] }) => {
+    const [isSubmenuOpen, setIsSubmenuOpen] = useState(false);
+    const location = useLocation();
+
     return (
         <li>
-            <Link
-                to={path}
-                className={`
-                    flex items-center px-3 py-2.5 text-sm font-medium rounded-2xl mx-2 mb-1
-                    transition-all duration-200
-                    ${active
-                        ? 'bg-violet-200 text-violet-900 shadow-md dark:bg-[#3a2e5a] dark:text-[#b39ddb]'
-                        : 'text-violet-500 hover:bg-violet-100 hover:text-violet-900 dark:text-[#b39ddb] dark:hover:bg-[#3a2e5a] dark:hover:text-[#ede7f6]'
-                    }
-                `}
-                title={text}
-            >
-                <span className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`}>{icon}</span>
-                {!collapsed && <span className="truncate">{text}</span>}
-            </Link>
+            <div className="flex flex-col">
+                <Link
+                    to={path}
+                    className={`
+                        flex items-center px-3 py-2.5 text-sm font-medium rounded-2xl mx-2 mb-1
+                        transition-all duration-200
+                        ${active
+                            ? 'bg-violet-200 text-violet-900 shadow-md dark:bg-[#3a2e5a] dark:text-[#b39ddb]'
+                            : 'text-violet-500 hover:bg-violet-100 hover:text-violet-900 dark:text-[#b39ddb] dark:hover:bg-[#3a2e5a] dark:hover:text-[#ede7f6]'
+                        }
+                    `}
+                    title={text}
+                    onClick={() => submenu.length > 0 && setIsSubmenuOpen(!isSubmenuOpen)}
+                >
+                    <span className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`}>{icon}</span>
+                    {!collapsed && (
+                        <>
+                            <span className="truncate flex-1">{text}</span>
+                            {submenu.length > 0 && (
+                                <ChevronDown 
+                                    size={16} 
+                                    className={`transform transition-transform ${isSubmenuOpen ? 'rotate-180' : ''}`}
+                                />
+                            )}
+                        </>
+                    )}
+                </Link>
+                {!collapsed && isSubmenuOpen && submenu.length > 0 && (
+                    <ul className="ml-6 mt-1 space-y-1">
+                        {submenu.map((item) => (
+                            <li key={item.path}>
+                                <Link
+                                    to={item.path}
+                                    className={`
+                                        block px-3 py-2 text-sm font-medium rounded-xl
+                                        ${location.pathname === item.path
+                                            ? 'bg-violet-100 text-violet-900 dark:bg-[#3a2e5a] dark:text-[#b39ddb]'
+                                            : 'text-violet-500 hover:bg-violet-50 hover:text-violet-900 dark:text-[#b39ddb] dark:hover:bg-[#3a2e5a] dark:hover:text-[#ede7f6]'
+                                        }
+                                    `}
+                                >
+                                    {item.text}
+                                </Link>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </div>
         </li>
     );
 };
@@ -51,8 +87,15 @@ const MainLayout = () => {
     const menuItemsData = [
         { path: '/dashboard', icon: <Activity size={20} />, text: '대시보드' },
         { path: '/workflow', icon: <Box size={20} />, text: '워크플로우' },
-        { path: '/data', icon: <Database size={20} />, text: '데이터 관리' },
-        { path: '/iot-devices', icon: <BarChart size={20} />, text: 'IoT 디바이스' },
+        { 
+            path: '/iot-devices', 
+            icon: <BarChart size={20} />, 
+            text: 'IoT 디바이스',
+            submenu: [
+                { path: '/iot-devices', text: '디바이스 관리' },
+                { path: '/iot-devices/data', text: '데이터 관리' }
+            ]
+        },
         { path: '/settings', icon: <Settings size={20} />, text: '설정' },
     ];
 
@@ -95,6 +138,7 @@ const MainLayout = () => {
                                 text={item.text}
                                 active={location.pathname.startsWith(item.path)}
                                 collapsed={sidebarCollapsed}
+                                submenu={item.submenu || []}
                             />
                         ))}
                     </ul>
@@ -126,20 +170,20 @@ const MainLayout = () => {
             {/* 메인 콘텐츠 */}
             <div className="flex-1 flex flex-col overflow-hidden">
                 {/* 헤더 */}
-                <header className="bg-[#b39ddb] dark:bg-[#3a2e5a] shadow-md h-16 flex items-center justify-between px-6 border-b border-[#b39ddb] dark:border-[#9575cd] rounded-b-2xl">
+                <header className="bg-[#b39ddb] dark:bg-[#3a2e5a] shadow-md h-16 flex items-center justify-between px-6 border-b border-[#b39ddb] dark:border-[#9575cd]">
                     <h1 className="text-xl font-semibold text-[#3a2e5a] dark:text-[#b39ddb]">{getPageTitle()}</h1>
                     <div className="flex items-center space-x-4">
-                        <button className="p-2 rounded-xl hover:bg-[#d1c4e9] dark:hover:bg-[#9575cd]" title="검색">
+                        <button className="p-2 hover:bg-[#d1c4e9] dark:hover:bg-[#9575cd]" title="검색">
                             <Search size={20} className="text-[#9575cd] dark:text-[#b39ddb]" />
                         </button>
-                        <button className="p-2 rounded-xl hover:bg-[#d1c4e9] dark:hover:bg-[#9575cd]" title="알림">
+                        <button className="p-2 hover:bg-[#d1c4e9] dark:hover:bg-[#9575cd]" title="알림">
                             <Bell size={20} className="text-[#9575cd] dark:text-[#b39ddb]" />
                         </button>
-                        <button className="p-2 rounded-xl hover:bg-[#d1c4e9] dark:hover:bg-[#9575cd]" title="도움말">
+                        <button className="p-2 hover:bg-[#d1c4e9] dark:hover:bg-[#9575cd]" title="도움말">
                             <HelpCircle size={20} className="text-[#9575cd] dark:text-[#b39ddb]" />
                         </button>
                         <button
-                            className="p-2 rounded-xl hover:bg-[#d1c4e9] dark:hover:bg-[#9575cd]"
+                            className="p-2 hover:bg-[#d1c4e9] dark:hover:bg-[#9575cd]"
                             title="다크모드 토글"
                             onClick={() => {
                                 document.documentElement.classList.toggle('dark');
