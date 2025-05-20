@@ -1,0 +1,152 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { Plus, Save, Trash2, Upload } from 'lucide-react';
+import WorkflowCanvas from '../components/workflow/WorkflowCanvas';
+import NodePalette from '../components/workflow/NodePalette';
+import PropertyEditor from '../components/workflow/PropertyEditor';
+
+const WorkflowCanvasPage = () => {
+    const [elements, setElements] = useState([]);
+    const [selectedNode, setSelectedNode] = useState(null);
+    const [workflowName, setWorkflowName] = useState('새 워크플로우');
+    const [showImportModal, setShowImportModal] = useState(false);
+    const navigate = useNavigate();
+    const { workflowId } = useParams();
+
+    const handleSaveWorkflow = async () => {
+        // TODO: API 호출하여 워크플로우 저장
+        console.log('Saving workflow:', { name: workflowName, elements });
+    };
+
+    const handleClearCanvas = () => {
+        if (window.confirm('모든 노드와 연결이 삭제됩니다. 계속하시겠습니까?')) {
+            setElements([]);
+            setSelectedNode(null);
+        }
+    };
+
+    const handleImportWorkflow = () => {
+        setShowImportModal(true);
+    };
+
+    const handleFileUpload = (event) => {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const workflowData = JSON.parse(e.target.result);
+                    setElements(workflowData.elements || []);
+                    setWorkflowName(workflowData.name || '불러온 워크플로우');
+                    setShowImportModal(false);
+                } catch (error) {
+                    alert('워크플로우 파일을 불러오는 중 오류가 발생했습니다.');
+                }
+            };
+            reader.readAsText(file);
+        }
+    };
+
+    return (
+        <div className="h-full flex flex-col">
+            {/* 상단 툴바 */}
+            <div className="bg-white dark:bg-[#3a2e5a] shadow-sm p-4 flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                    <input
+                        type="text"
+                        value={workflowName}
+                        onChange={(e) => setWorkflowName(e.target.value)}
+                        className="text-xl font-semibold bg-transparent border-b border-[#d1c4e9] dark:border-[#9575cd] focus:border-[#7e57c2] dark:focus:border-[#b39ddb] focus:outline-none px-2 py-1 text-[#3a2e5a] dark:text-[#b39ddb]"
+                    />
+                </div>
+                <div className="flex items-center space-x-2">
+                    <button
+                        onClick={handleSaveWorkflow}
+                        className="flex items-center px-3 py-2 bg-[#7e57c2] dark:bg-[#9575cd] text-white rounded-xl hover:bg-[#5e35b1] dark:hover:bg-[#b39ddb] transition-colors duration-200"
+                    >
+                        <Save size={20} className="mr-2" />
+                        저장
+                    </button>
+                    <button
+                        onClick={handleImportWorkflow}
+                        className="flex items-center px-3 py-2 bg-[#9575cd] dark:bg-[#b39ddb] text-white rounded-xl hover:bg-[#7e57c2] dark:hover:bg-[#ede7f6] transition-colors duration-200"
+                    >
+                        <Upload size={20} className="mr-2" />
+                        불러오기
+                    </button>
+                    <button
+                        onClick={handleClearCanvas}
+                        className="flex items-center px-3 py-2 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors duration-200"
+                    >
+                        <Trash2 size={20} className="mr-2" />
+                        초기화
+                    </button>
+                </div>
+            </div>
+
+            {/* 메인 콘텐츠 영역 */}
+            <div className="flex-1 flex overflow-hidden">
+                {/* 왼쪽 노드 팔레트 */}
+                <div className="w-60 bg-white dark:bg-[#3a2e5a] shadow-sm border-r border-[#d1c4e9] dark:border-[#9575cd] overflow-y-auto">
+                    <NodePalette />
+                </div>
+
+                {/* 중앙 캔버스 */}
+                <div className="flex-1 bg-[#f8f6fc] dark:bg-[#2a2139] relative">
+                    <WorkflowCanvas 
+                        elements={elements} 
+                        setElements={setElements}
+                        selectedNode={selectedNode}
+                        setSelectedNode={setSelectedNode}
+                    />
+                </div>
+
+                {/* 오른쪽 속성 편집기 */}
+                <div className="w-72 bg-white dark:bg-[#3a2e5a] shadow-sm border-l border-[#d1c4e9] dark:border-[#9575cd] overflow-y-auto">
+                    <PropertyEditor 
+                        selectedNode={selectedNode}
+                        onUpdateNode={(nodeId, updatedProps) => {
+                            setElements(currentElements =>
+                                currentElements.map(el => {
+                                    if (el.id === nodeId) {
+                                        return { ...el, ...updatedProps };
+                                    }
+                                    return el;
+                                })
+                            );
+                        }}
+                    />
+                </div>
+            </div>
+
+            {/* 불러오기 모달 */}
+            {showImportModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                    <div className="bg-white dark:bg-[#3a2e5a] rounded-xl p-6 w-full max-w-md">
+                        <h2 className="text-xl font-semibold text-[#3a2e5a] dark:text-[#b39ddb] mb-4">
+                            워크플로우 불러오기
+                        </h2>
+                        <div className="mb-4">
+                            <input
+                                type="file"
+                                onChange={handleFileUpload}
+                                className="w-full px-4 py-2 border border-[#d1c4e9] dark:border-[#9575cd] rounded-lg bg-white dark:bg-[#2a2139] text-[#3a2e5a] dark:text-[#b39ddb]"
+                                accept=".json"
+                            />
+                        </div>
+                        <div className="flex justify-end space-x-2">
+                            <button
+                                onClick={() => setShowImportModal(false)}
+                                className="px-4 py-2 text-[#3a2e5a] dark:text-[#b39ddb] hover:bg-[#f8f6fc] dark:hover:bg-[#2a2139] rounded-lg transition-colors duration-200"
+                            >
+                                취소
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default WorkflowCanvasPage; 

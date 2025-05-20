@@ -5,7 +5,7 @@ import CytoscapeComponent from 'react-cytoscapejs';
 import WorkflowCanvas from '../components/workflow/WorkflowCanvas';
 import NodePalette from '../components/workflow/NodePalette';
 import PropertyEditor from '../components/workflow/PropertyEditor';
-import { Box, Plus, Save, Trash2 } from 'lucide-react'; // 사용되는 아이콘만
+import { Box, Plus, Save, Trash2, Upload } from 'lucide-react'; // 사용되는 아이콘만
 import { saveWorkflow, getWorkflows, getWorkflowById, updateWorkflow } from '../services/workflowService';
 import { getCurrentUserData } from '../services/authService';
 
@@ -22,6 +22,8 @@ function WorkflowPage() {
 
     const currentUserData = getCurrentUserData();
     const username = currentUserData?.username || '사용자';
+
+    const [showImportModal, setShowImportModal] = useState(false);
 
     // 워크플로우 로드 또는 새 워크플로우 초기화
     useEffect(() => {
@@ -129,6 +131,15 @@ function WorkflowPage() {
         navigate('/workflow');
     };
 
+    const handleNewWorkflow = () => {
+        // 새 워크플로우 생성 페이지로 이동
+        navigate('/workflow/new');
+    };
+
+    const handleImportWorkflow = () => {
+        setShowImportModal(true);
+    };
+
     if (isLoading && workflowId) {
         return (
             <div className="flex items-center justify-center h-full">
@@ -138,65 +149,44 @@ function WorkflowPage() {
     }
 
     return (
-        <div className="h-full flex flex-col">
-            {/* 상단 툴바 */}
-            <div className="bg-white shadow-sm p-4 flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                    <input
-                        type="text"
-                        value={workflowName}
-                        onChange={(e) => setWorkflowName(e.target.value)}
-                        className="text-xl font-semibold bg-transparent border-b border-purple-300 focus:border-purple-400 focus:outline-none px-2 py-1"
-                    />
-                </div>
-                <div className="flex items-center space-x-2">
-                    <button
-                        onClick={handleCreateNewWorkflow}
-                        className="flex items-center px-3 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 transition-colors"
-                    >
-                        <Plus size={20} className="mr-2" />
-                        새로 만들기
-                    </button>
-                    <button
-                        onClick={handleSaveWorkflow}
-                        className="flex items-center px-3 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 transition-colors"
-                    >
-                        <Save size={20} className="mr-2" />
-                        저장
-                    </button>
-                    <button
-                        onClick={handleClearCanvas}
-                        className="flex items-center px-3 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
-                    >
-                        <Trash2 size={20} className="mr-2" />
-                        초기화
-                    </button>
-                </div>
-            </div>
-
-            {/* 메인 콘텐츠 영역 */}
-            <div className="flex-1 flex overflow-hidden">
-                {/* 왼쪽 노드 팔레트 */}
-                <div className="w-60 bg-white shadow-sm border-r overflow-y-auto">
-                    <NodePalette />
+        <div className="min-h-screen bg-[#f8f6fc] dark:bg-[#2a2139] p-6">
+            <div className="max-w-7xl mx-auto">
+                <div className="flex items-center justify-between mb-8">
+                    <h1 className="text-3xl font-bold text-[#3a2e5a] dark:text-[#b39ddb]">
+                        워크플로우 관리
+                    </h1>
+                    <div className="flex space-x-4">
+                        <button
+                            onClick={handleNewWorkflow}
+                            className="flex items-center px-4 py-2 bg-[#7e57c2] dark:bg-[#9575cd] text-white rounded-xl hover:bg-[#5e35b1] dark:hover:bg-[#b39ddb] transition-colors duration-200"
+                        >
+                            <Plus size={20} className="mr-2" />
+                            새로 만들기
+                        </button>
+                    </div>
                 </div>
 
-                {/* 중앙 캔버스 */}
-                <div className="flex-1 bg-purple-50 relative">
-                    <WorkflowCanvas 
-                        elements={elements} 
-                        setElements={setElements}
-                        onCyInit={handleCyInit} // 자식에게 콜백 전달
-                        selectedNodeId={selectedNode ? selectedNode.id : null} // 선택된 노드 ID 전달
-                    />
-                </div>
-
-                {/* 오른쪽 속성 편집기 */}
-                <div className="w-72 bg-white shadow-sm border-l overflow-y-auto">
-                    <PropertyEditor 
-                        selectedNode={selectedNode}
-                        onUpdateNode={handleUpdateNode} // 업데이트 콜백 전달
-                    />
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {/* 워크플로우 카드 예시 */}
+                    <div className="bg-white dark:bg-[#3a2e5a] rounded-xl shadow-lg p-6">
+                        <h3 className="text-lg font-semibold text-[#3a2e5a] dark:text-[#b39ddb] mb-2">
+                            예시 워크플로우
+                        </h3>
+                        <p className="text-[#9575cd] dark:text-[#b39ddb] text-sm mb-4">
+                            마지막 수정: 2024-03-21
+                        </p>
+                        <div className="flex justify-end space-x-2">
+                            <button 
+                                onClick={() => navigate('/workflow/edit/1')}
+                                className="px-3 py-1 text-sm bg-[#7e57c2] dark:bg-[#9575cd] text-white rounded-lg hover:bg-[#5e35b1] dark:hover:bg-[#b39ddb] transition-colors duration-200"
+                            >
+                                편집
+                            </button>
+                            <button className="px-3 py-1 text-sm bg-[#9575cd] dark:bg-[#b39ddb] text-white rounded-lg hover:bg-[#7e57c2] dark:hover:bg-[#ede7f6] transition-colors duration-200">
+                                삭제
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

@@ -6,6 +6,7 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import WorkflowPage from './pages/WorkflowPage';
+import WorkflowCanvasPage from './pages/WorkflowCanvasPage';
 import DataManagementPage from './pages/DataManagementPage';
 import IotDevicesPage from './pages/IotDevicesPage';
 import SettingsPage from './pages/SettingsPage';
@@ -30,7 +31,8 @@ function App() {
                     <Route path="/" element={<Navigate to="/dashboard" replace />} />
                     <Route path="/dashboard" element={<DashboardPage />} />
                     <Route path="/workflow" element={<WorkflowPage />} />
-                    <Route path="/workflow/:workflowId" element={<WorkflowPage />} />
+                    <Route path="/workflow/new" element={<WorkflowCanvasPage />} />
+                    <Route path="/workflow/edit/:workflowId" element={<WorkflowCanvasPage />} />
                     <Route path="/iot-devices" element={<IotDevicesPage />} />
                     <Route path="/iot-devices/data" element={<DataManagementPage />} />
                     <Route path="/settings" element={<SettingsPage />} />

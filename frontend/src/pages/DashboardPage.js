@@ -173,7 +173,7 @@ function DashboardPage() {
                 <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 hover:shadow-2xl transition-shadow">
                     <div className="flex justify-between items-center mb-4">
                         <h3 className="text-base sm:text-lg font-semibold text-gray-700">최근 워크플로우</h3>
-                        <Link to="/workflow-builder" className="text-sky-600 hover:text-sky-700 text-sm font-medium">새로 만들기</Link>
+                        <Link to="/workflow/new" className="text-sky-600 hover:text-sky-700 text-sm font-medium">새로 만들기</Link>
                     </div>
                     <div className="space-y-1 max-h-72 overflow-y-auto custom-scrollbar">
                         {recentWorkflows.length > 0 ? recentWorkflows.map((wf, index) => (
