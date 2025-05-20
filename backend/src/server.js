@@ -1,0 +1,76 @@
+// File: backend/src/server.js
+const express = require('express');
+const cors = require('cors');
+const http = require('http');
+const { Server } = require("socket.io");
+
+const authRoutes = require('./routes/authRoutes');
+const workflowRoutes = require('./routes/workflowRoutes');
+const dashboardRoutes = require('./routes/dashboardRoutes'); // Added dashboard routes
+
+const app = express();
+const httpServer = http.createServer(app);
+
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
+
+const io = new Server(httpServer, {
+    cors: {
+        origin: FRONTEND_URL,
+        methods: ["GET", "POST"]
+    }
+});
+
+const PORT = process.env.PORT || 3001;
+
+app.use(cors({ origin: FRONTEND_URL }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+app.use('/api/auth', authRoutes);
+app.use('/api/workflows', workflowRoutes);
+app.use('/api/dashboard', dashboardRoutes); // Added for dashboard data
+
+app.get('/', (req, res) => {
+  res.send('IoT Hub System Backend - MOCKUP MODE');
+});
+
+io.on('connection', (socket) => {
+    console.log(`Socket.IO client connected: ${socket.id}`);
+    socket.emit('welcome', `Welcome to the IoT Hub Mockup, client ${socket.id}!`);
+    socket.on('disconnect', () => console.log(`Socket.IO client disconnected: ${socket.id}`));
+});
+
+let temperature = 23 + Math.random() * 4; // Start with a more realistic temp
+let humidity = 40 + Math.random() * 20;  // Start with a more realistic humidity
+const sensorDataInterval = setInterval(() => {
+    temperature += (Math.random() - 0.5) * 0.2;
+    humidity += (Math.random() - 0.5) * 1;
+    temperature = Math.max(18, Math.min(32, temperature)); 
+    humidity = Math.max(30, Math.min(75, humidity));
+
+    const sensorData = {
+        time: new Date().toISOString(),
+        temperature: parseFloat(temperature.toFixed(1)),
+        humidity: parseFloat(humidity.toFixed(1)),
+        // Add more simulated data points if your dashboard expects them
+        pressure: parseFloat((980 + Math.random() * 50).toFixed(1)), // hPa
+        lightLevel: Math.floor(300 + Math.random() * 400) // lux
+    };
+    io.emit('newSensorData', sensorData);
+}, 2000);
+
+const cleanup = () => {
+    console.log('Cleaning up mock server resources...');
+    clearInterval(sensorDataInterval);
+    httpServer.close(() => {
+        console.log('HTTP server closed.');
+        process.exit(0);
+    });
+};
+process.on('SIGINT', cleanup);
+process.on('SIGTERM', cleanup);
+
+httpServer.listen(PORT, () => {
+  console.log(`Mock Backend server (Socket.IO) running on port ${PORT}`);
+  console.log(`Allowed frontend origin: ${FRONTEND_URL}`);
+});

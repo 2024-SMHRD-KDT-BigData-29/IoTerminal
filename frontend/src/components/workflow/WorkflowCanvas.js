@@ -1,0 +1,348 @@
+// File: frontend/src/components/workflow/WorkflowCanvas.js
+import React, { useRef, useEffect, useCallback, useState } from 'react';
+import CytoscapeComponent from 'react-cytoscapejs';
+import cytoscape from 'cytoscape';
+import edgehandles from 'cytoscape-edgehandles';
+import { Trash2, Link2 } from 'lucide-react';
+
+// Register edgehandles extension globally and only once.
+if (!cytoscape.prototype.edgehandlesRegistered) {
+    try {
+        cytoscape.use(edgehandles);
+        cytoscape.prototype.edgehandlesRegistered = true;
+    } catch (e) {
+        console.warn('Could not re-register edgehandles:', e);
+    }
+}
+
+const baseStylesheet = [
+    {
+        selector: 'node',
+        style: {
+            'label': 'data(label)',
+            'width': 70,
+            'height': 70,
+            'text-valign': 'center',
+            'text-halign': 'center',
+            'color': '#fff',
+            'font-size': '15px',
+            'font-weight': 'bold',
+            'background-color': '#b39ddb',
+            'border-color': '#9575cd',
+            'border-width': 2,
+            'padding': '10px',
+            'text-wrap': 'wrap',
+            'text-max-width': '60px',
+            'transition-property': 'background-color, border-color',
+            'transition-duration': '0.2s'
+        }
+    },
+    { selector: 'node[type="Input"]', style: {
+        'background-color': '#7e57c2',
+        'border-color': '#5e35b1',
+        'shape': 'ellipse',
+        'font-weight': 'bold'
+    } },
+    { selector: 'node[type="Process"]', style: {
+        'background-color': '#9575cd',
+        'border-color': '#7e57c2',
+        'shape': 'round-rectangle',
+        'font-weight': 'bold'
+    } },
+    { selector: 'node[type="Output"]', style: {
+        'background-color': '#d1c4e9',
+        'border-color': '#b39ddb',
+        'color': '#5e35b1',
+        'shape': 'rectangle',
+        'font-weight': 'bold'
+    } },
+    { selector: 'node[type="Condition"]', style: {
+        'background-color': '#ede7f6',
+        'border-color': '#b39ddb',
+        'color': '#7e57c2',
+        'shape': 'diamond',
+        'font-weight': 'bold'
+    } },
+    { selector: 'node:selected', style: { 'border-color': '#7e57c2', 'border-width': 4, 'overlay-color': '#b39ddb', 'overlay-opacity': 0.18 } },
+    { selector: 'edge', style: { 
+        'width': 3, 
+        'line-color': '#b39ddb', 
+        'target-arrow-color': '#b39ddb', 
+        'target-arrow-shape': 'triangle', 
+        'curve-style': 'bezier', 
+        'label': 'data(label)', 
+        'font-size': '12px', 
+        'color': '#7e57c2', 
+        'text-background-opacity': 1, 
+        'text-background-color': '#fff', 
+        'text-background-padding': '2px',
+        'line-style': 'solid',
+        'arrow-scale': 1.2
+    }},
+    { selector: '.eh-handle', style: {
+        'background-color': '#7e57c2',
+        'width': 12,
+        'height': 12,
+        'shape': 'ellipse',
+        'border-width': 2,
+        'border-color': '#fff',
+        'border-style': 'solid',
+        'opacity': 1,
+        'z-index': 9999
+    }},
+    { selector: '.eh-handle:active', style: {
+        'background-color': '#5e35b1',
+        'width': 16,
+        'height': 16
+    }},
+    { selector: '.eh-source, .eh-target', style: {
+        'border-width': 3,
+        'border-color': '#7e57c2',
+        'border-style': 'dashed'
+    }},
+    { selector: '.eh-preview, .eh-ghost-edge, .eh-ghost-edge.eh-preview-active', style: {
+        'line-color': '#7e57c2',
+        'target-arrow-color': '#7e57c2',
+        'target-arrow-shape': 'triangle',
+        'opacity': 0.7,
+        'line-style': 'dashed',
+        'width': 3,
+        'z-index': 9999
+    }}
+];
+
+function WorkflowCanvas({ elements, setElements, onCyInit, selectedNodeId }) {
+    const cyRef = useRef(null);
+    const canvasContainerRef = useRef(null);
+    const [isEdgeMode, setIsEdgeMode] = useState(false);
+    const sourceNodeRef = useRef(null);
+    const previewEdgeRef = useRef(null);
+
+    const cyCallbackRef = useCallback(cyInstance => {
+        if (cyInstance && cyRef.current !== cyInstance) {
+            cyRef.current = cyInstance;
+            if (onCyInit && typeof onCyInit === 'function') {
+                onCyInit(cyInstance);
+                cyInstance.isCyInitDoneFlag = true;
+            }
+        } else if (!cyInstance && cyRef.current) {
+            cyRef.current = null;
+        }
+    }, [onCyInit]);
+
+    useEffect(() => {
+        const cy = cyRef.current;
+        const container = canvasContainerRef.current;
+        if (!cy) return;
+        if (!container) return;
+
+        console.log('Cytoscape instance initialized:', cy);
+        
+        // 기본 설정
+        cy.autoungrabify(false);
+        cy.panningEnabled(true);
+        cy.boxSelectionEnabled(true);
+        cy.zoomingEnabled(true);
+
+        const handleDragOver = (event) => {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'move';
+        };
+        const handleDrop = (event) => {
+            event.preventDefault();
+            const type = event.dataTransfer.getData('application/reactflow-nodetype');
+            let label = event.dataTransfer.getData('application/reactflow-nodelabel');
+            const nodeConfigString = event.dataTransfer.getData('application/reactflow-nodeconfig');
+            let nodeConfig = {};
+            if (!type) return;
+            try {
+                if (nodeConfigString) {
+                    nodeConfig = JSON.parse(nodeConfigString);
+                }
+            } catch (e) {
+                console.error("Error parsing nodeConfig from drag event:", e);
+            }
+            if (!label) label = type;
+            const bounds = container.getBoundingClientRect();
+            const pan = cy.pan();
+            const zoom = cy.zoom();
+            const modelX = (event.clientX - bounds.left - pan.x) / zoom;
+            const modelY = (event.clientY - bounds.top - pan.y) / zoom;
+            const newNode = {
+                group: 'nodes',
+                data: {
+                    id: `${type.toLowerCase().replace(/\s+/g, '-')}_${Date.now()}`,
+                    label: label,
+                    type: type,
+                    config: nodeConfig
+                },
+                position: { x: modelX, y: modelY }
+            };
+            console.log('Adding new node:', newNode);
+            setElements(prevElements => [...prevElements, newNode]);
+        };
+        container.addEventListener('dragover', handleDragOver);
+        container.addEventListener('drop', handleDrop);
+        return () => {
+            container.removeEventListener('dragover', handleDragOver);
+            container.removeEventListener('drop', handleDrop);
+        };
+    }, [setElements]);
+
+    useEffect(() => {
+        const cy = cyRef.current;
+        if (!cy) return;
+
+        function handleNodeClick(evt) {
+            const node = evt.target;
+            if (!node.isNode()) return;
+            console.log('Node clicked:', node.id(), 'Current source node:', sourceNodeRef.current?.id());
+            if (!sourceNodeRef.current) {
+                // 첫 번째 노드 선택
+                sourceNodeRef.current = node;
+                node.style('border-width', 3);
+                node.style('border-color', '#7e57c2');
+                node.style('border-style', 'dashed');
+            } else {
+                // 두 번째 노드 선택 - 엣지 생성
+                if (sourceNodeRef.current.id() !== node.id()) {
+                    const newEdgeData = {
+                        group: 'edges',
+                        data: {
+                            id: `edge_${sourceNodeRef.current.id()}_${node.id()}_${Date.now()}`,
+                            source: sourceNodeRef.current.id(),
+                            target: node.id(),
+                            label: '',
+                            type: 'default'
+                        }
+                    };
+                    setElements(prevElements => {
+                        const edgeExists = prevElements.some(el =>
+                            el.group === 'edges' &&
+                            el.data.source === newEdgeData.data.source &&
+                            el.data.target === newEdgeData.data.target
+                        );
+                        if (!edgeExists) {
+                            return [...prevElements, newEdgeData];
+                        }
+                        return prevElements;
+                    });
+                }
+                // 상태 초기화
+                sourceNodeRef.current.style('border-width', 2);
+                sourceNodeRef.current.style('border-color', '#9575cd');
+                sourceNodeRef.current.style('border-style', 'solid');
+                sourceNodeRef.current = null;
+                if (previewEdgeRef.current) {
+                    previewEdgeRef.current.remove();
+                    previewEdgeRef.current = null;
+                }
+            }
+        }
+
+        function handleMouseMove(evt) {
+            if (sourceNodeRef.current && evt.cyRenderedPosition) {
+                const pos = evt.cyRenderedPosition;
+                if (previewEdgeRef.current) {
+                    previewEdgeRef.current.remove();
+                    previewEdgeRef.current = null;
+                }
+                // 미리보기 엣지 생성
+                previewEdgeRef.current = cy.add({
+                    group: 'edges',
+                    data: {
+                        id: 'preview-edge',
+                        source: sourceNodeRef.current.id(),
+                        target: { x: pos.x, y: pos.y }
+                    },
+                    style: {
+                        'line-color': '#7e57c2',
+                        'target-arrow-color': '#7e57c2',
+                        'target-arrow-shape': 'triangle',
+                        'opacity': 0.7,
+                        'line-style': 'dashed',
+                        'width': 3
+                    }
+                });
+            }
+        }
+
+        if (isEdgeMode) {
+            cy.on('tap', 'node', handleNodeClick);
+            cy.on('mousemove', handleMouseMove);
+        }
+        return () => {
+            cy.removeListener('tap', 'node', handleNodeClick);
+            cy.removeListener('mousemove', handleMouseMove);
+            if (previewEdgeRef.current) {
+                previewEdgeRef.current.remove();
+                previewEdgeRef.current = null;
+            }
+            if (sourceNodeRef.current) {
+                sourceNodeRef.current.style('border-width', 2);
+                sourceNodeRef.current.style('border-color', '#9575cd');
+                sourceNodeRef.current.style('border-style', 'solid');
+                sourceNodeRef.current = null;
+            }
+        };
+    }, [isEdgeMode, setElements]);
+
+    return (
+        <div className="h-full w-full bg-purple-50 relative flex items-center justify-center rounded-2xl shadow-xl transition-all duration-300">
+            <div 
+                ref={canvasContainerRef} 
+                className="h-full w-full max-w-[1600px] rounded-2xl shadow-lg border border-purple-100"
+                style={{ touchAction: 'none' }}
+            >
+                <CytoscapeComponent
+                    elements={CytoscapeComponent.normalizeElements(elements)}
+                    className="h-full w-full rounded-2xl"
+                    stylesheet={baseStylesheet}
+                    cy={cyCallbackRef}
+                    layout={{ name: 'preset' }} 
+                />
+            </div>
+            <div className="absolute top-4 right-4 flex gap-2 z-10">
+                <button
+                    onClick={() => {
+                        setIsEdgeMode(mode => !mode);
+                        sourceNodeRef.current = null;
+                        previewEdgeRef.current = null;
+                    }}
+                    className={`p-2 rounded-full shadow transition-colors border border-purple-200 flex items-center justify-center w-10 h-10 ${
+                        isEdgeMode 
+                            ? 'bg-purple-500 text-white hover:bg-purple-600' 
+                            : 'bg-white text-purple-700 hover:bg-purple-100'
+                    }`}
+                    title="엣지 연결 모드"
+                >
+                    <Link2 size={20} />
+                </button>
+                <button
+                    onClick={() => {
+                        const cy = cyRef.current;
+                        const selectedElements = cy?.elements(':selected');
+                        if (selectedElements && selectedElements.length > 0) {
+                            const selectedIds = selectedElements.map(ele => ele.id());
+                            setElements(prevElements => 
+                                prevElements.filter(el => !selectedIds.includes(el.data.id))
+                            );
+                            selectedElements.remove();
+                        }
+                    }}
+                    className="p-2 rounded-full shadow bg-white text-purple-700 hover:bg-purple-100 border border-purple-200 flex items-center justify-center w-10 h-10"
+                    title="선택 항목 삭제"
+                >
+                    <Trash2 size={20} />
+                </button>
+            </div>
+            {isEdgeMode && (
+                <div className="absolute top-20 right-4 bg-white/90 text-purple-700 rounded-xl shadow-lg px-4 py-2 text-xs font-semibold z-20 border border-purple-200">
+                    {sourceNodeRef.current ? '연결할 노드를 클릭하세요.' : '시작 노드를 클릭하세요.'}
+                </div>
+            )}
+        </div>
+    );
+}
+
+export default WorkflowCanvas;
