@@ -109,16 +109,20 @@ export const getRecentWorkflows = async () => {
       throw new Error('인증 토큰이 없습니다. 다시 로그인해주세요.');
     }
 
-    const response = await fetch(`${API_URL}/workflow/list?limit=3`, {
+    console.log('최근 워크플로우 조회 시도...');
+    const response = await fetch(`${API_URL}/workflow/list`, {
       headers: {
         'Authorization': `Bearer ${token}`
       }
     });
 
     const data = await response.json();
+    console.log('최근 워크플로우 응답:', data);
     
     if (!response.ok) {
-      throw new Error(data.message || '최근 워크플로우 조회에 실패했습니다.');
+      const errorMessage = data.error || data.message || '최근 워크플로우 조회에 실패했습니다.';
+      console.error('서버 응답 오류:', errorMessage);
+      throw new Error(errorMessage);
     }
 
     return data;

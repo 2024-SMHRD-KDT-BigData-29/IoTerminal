@@ -56,27 +56,27 @@ exports.createWorkflow = async (req, res) => {
 exports.getUserWorkflows = async (req, res) => {
     try {
         const userId = req.user.userId;
-        const limit = req.query.limit ? parseInt(req.query.limit) : null;
+        console.log('조회할 사용자 ID:', userId);
+
+        // 기본 쿼리로 먼저 시도
+        const query = 'SELECT workflow_id, name, description, created_at, updated_at, is_public FROM workflows WHERE user_id = ? ORDER BY updated_at DESC LIMIT 3';
         
-        let query = 'SELECT workflow_id, name, description, created_at, updated_at, is_public FROM workflows WHERE user_id = ? OR is_public = true ORDER BY updated_at DESC';
-        let params = [userId];
+        console.log('실행할 쿼리:', query);
+        console.log('파라미터:', [userId]);
 
-        if (limit) {
-            query += ' LIMIT ?';
-            params.push(limit);
-        }
-
-        const [workflows] = await pool.execute(query, params);
+        const [workflows] = await pool.execute(query, [userId]);
+        console.log('조회된 워크플로우:', workflows);
 
         res.json({
             success: true,
-            workflows
+            workflows: workflows || []
         });
     } catch (error) {
-        console.error('워크플로우 목록 조회 실패:', error);
+        console.error('워크플로우 목록 조회 실패 - 상세 오류:', error);
         res.status(500).json({
             success: false,
-            message: '워크플로우 목록 조회 중 오류가 발생했습니다.'
+            message: '워크플로우 목록 조회 중 오류가 발생했습니다.',
+            error: error.message
         });
     }
 };
