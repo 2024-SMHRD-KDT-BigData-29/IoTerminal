@@ -1,4 +1,8 @@
-export const login = async (userId, password) => {
+import axios from 'axios';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
+
+export const login = async (userId, password, keepLoggedIn = false) => {
     try {
         const response = await fetch('http://localhost:3001/api/auth/login', {
             method: 'POST',
@@ -14,9 +18,14 @@ export const login = async (userId, password) => {
             throw new Error(data.message || '로그인에 실패했습니다.');
         }
 
-        // 세션 스토리지에 저장
-        sessionStorage.setItem('user', JSON.stringify(data.user));
-        sessionStorage.setItem('token', data.token);
+        // 로그인 유지 여부에 따라 저장소 선택
+        if (keepLoggedIn) {
+            localStorage.setItem('user', JSON.stringify(data.user));
+            localStorage.setItem('token', data.token);
+        } else {
+            sessionStorage.setItem('user', JSON.stringify(data.user));
+            sessionStorage.setItem('token', data.token);
+        }
         
         return data;
     } catch (error) {
@@ -62,16 +71,25 @@ export const register = async (userData) => {
     }
 };
 
-export const getCurrentUserToken = () => {
-    return sessionStorage.getItem('token');
+export const getCurrentUserData = () => {
+    const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
+    if (userStr) {
+        return JSON.parse(userStr);
+    }
+    return null;
 };
 
-export const getCurrentUserData = () => {
-    const user = sessionStorage.getItem('user');
-    return user ? JSON.parse(user) : null;
+export const getCurrentUserToken = () => {
+    return localStorage.getItem('token') || sessionStorage.getItem('token');
 };
 
 export const logout = () => {
-    sessionStorage.removeItem('user');
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     sessionStorage.removeItem('token');
+    sessionStorage.removeItem('user');
+};
+
+export const isAuthenticated = () => {
+    return !!(localStorage.getItem('token') || sessionStorage.getItem('token'));
 }; 

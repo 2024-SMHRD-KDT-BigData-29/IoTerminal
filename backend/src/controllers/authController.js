@@ -98,7 +98,7 @@ exports.login = async (req, res) => {
         // JWT 토큰 생성
         const token = jwt.sign(
             { 
-                userId: user.user_id,
+                user_id: user.user_id,
                 name: user.name,
                 role: user.role || 'user'
             },
@@ -107,7 +107,10 @@ exports.login = async (req, res) => {
         );
 
         // 응답 데이터에서 비밀번호 제외
-        const { password: _, ...userWithoutPassword } = user;
+        let { password: _, ...userWithoutPassword } = user;
+        if (!userWithoutPassword.user_id && user.user_id) {
+            userWithoutPassword.user_id = user.user_id;
+        }
 
         res.json({
             success: true,

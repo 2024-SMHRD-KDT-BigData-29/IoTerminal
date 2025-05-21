@@ -3,8 +3,15 @@ const pool = require('../config/database');
 
 exports.createWorkflow = async (req, res) => {
     const { name, description, nodes, edges, isPublic } = req.body;
-    const userId = req.user.userId;
+    const userId = req.user.user_id;
     
+    if (!userId) {
+        return res.status(400).json({
+            success: false,
+            message: 'user_id가 필요합니다.'
+        });
+    }
+
     console.log('워크플로우 생성 요청:', { name, userId });
 
     if (!name) {
@@ -54,19 +61,16 @@ exports.createWorkflow = async (req, res) => {
 };
 
 exports.getUserWorkflows = async (req, res) => {
+    const userId = req.user.user_id;
+    if (!userId) {
+        return res.status(400).json({
+            success: false,
+            message: 'user_id가 필요합니다.'
+        });
+    }
     try {
-        const userId = req.user.userId;
-        console.log('조회할 사용자 ID:', userId);
-
-        // 기본 쿼리로 먼저 시도
         const query = 'SELECT workflow_id, name, description, created_at, updated_at, is_public FROM workflows WHERE user_id = ? ORDER BY updated_at DESC LIMIT 3';
-        
-        console.log('실행할 쿼리:', query);
-        console.log('파라미터:', [userId]);
-
         const [workflows] = await pool.execute(query, [userId]);
-        console.log('조회된 워크플로우:', workflows);
-
         res.json({
             success: true,
             workflows: workflows || []
@@ -84,7 +88,14 @@ exports.getUserWorkflows = async (req, res) => {
 exports.getWorkflowById = async (req, res) => {
     try {
         const { workflowId } = req.params;
-        const userId = req.user.userId;
+        const userId = req.user.user_id;
+
+        if (!userId) {
+            return res.status(400).json({
+                success: false,
+                message: 'user_id가 필요합니다.'
+            });
+        }
 
         const [workflows] = await pool.execute(
             'SELECT * FROM workflows WHERE workflow_id = ? AND (user_id = ? OR is_public = true)',
@@ -136,7 +147,21 @@ exports.updateWorkflow = async (req, res) => {
     try {
         const { workflowId } = req.params;
         const { name, description, nodes, edges, isPublic } = req.body;
-        const userId = req.user.userId;
+        const userId = req.user.user_id;
+
+        if (!userId) {
+            return res.status(400).json({
+                success: false,
+                message: 'user_id가 필요합니다.'
+            });
+        }
+
+        if (!workflowId) {
+            return res.status(400).json({
+                success: false,
+                message: 'workflow_id가 필요합니다.'
+            });
+        }
 
         // 워크플로우 존재 여부와 권한 확인
         const [existingWorkflow] = await pool.execute(
@@ -197,7 +222,21 @@ exports.updateWorkflow = async (req, res) => {
 exports.deleteWorkflow = async (req, res) => {
     try {
         const { workflowId } = req.params;
-        const userId = req.user.userId;
+        const userId = req.user.user_id;
+
+        if (!userId) {
+            return res.status(400).json({
+                success: false,
+                message: 'user_id가 필요합니다.'
+            });
+        }
+
+        if (!workflowId) {
+            return res.status(400).json({
+                success: false,
+                message: 'workflow_id가 필요합니다.'
+            });
+        }
 
         const [result] = await pool.execute(
             'DELETE FROM workflows WHERE workflow_id = ? AND user_id = ?',
@@ -226,7 +265,15 @@ exports.deleteWorkflow = async (req, res) => {
 
 exports.getRecentWorkflows = async (req, res) => {
     try {
-        const userId = req.user.userId;
+        const userId = req.user.user_id;
+
+        if (!userId) {
+            return res.status(400).json({
+                success: false,
+                message: 'user_id가 필요합니다.'
+            });
+        }
+
         const [workflows] = await pool.execute(
             'SELECT workflow_id, name, description, created_at, updated_at, is_public FROM workflows WHERE user_id = ? OR is_public = true ORDER BY updated_at DESC LIMIT 3',
             [userId]

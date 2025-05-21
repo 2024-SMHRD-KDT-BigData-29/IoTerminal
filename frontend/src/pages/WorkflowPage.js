@@ -22,36 +22,32 @@ function WorkflowPage() {
     const [isLoading, setIsLoading] = useState(true);
 
     const user = getCurrentUserData();
-    const userId = user?.user_id || user?.userId || user?.id;
+    const userId = user?.user_id;
 
     const [showImportModal, setShowImportModal] = useState(false);
 
     const [workflows, setWorkflows] = useState([]);
 
     const fetchWorkflows = useCallback(async () => {
-        if (!userId) {
-            console.error('사용자 ID가 없습니다.');
-            return;
-        }
-
         try {
-            setIsLoading(true);
-            const response = await getWorkflowList(userId);
+            const response = await getWorkflowList();
             if (response.success) {
                 setWorkflows(response.workflows);
             }
         } catch (error) {
             console.error('워크플로우 목록 조회 실패:', error);
-        } finally {
-            setIsLoading(false);
+            if (error.message.includes('인증')) {
+                alert('로그인이 필요합니다.');
+                navigate('/login');
+            } else {
+                alert('워크플로우 목록을 불러오는데 실패했습니다.');
+            }
         }
-    }, [userId]);
+    }, [navigate]);
 
     useEffect(() => {
-        if (userId) {
-            fetchWorkflows();
-        }
-    }, [userId, fetchWorkflows]);
+        fetchWorkflows();
+    }, [fetchWorkflows]);
 
     // 워크플로우 로드 또는 새 워크플로우 초기화
     useEffect(() => {
@@ -59,15 +55,15 @@ function WorkflowPage() {
             setIsLoading(true);
             const fetchWorkflow = async () => {
                 try {
-                    const existingWorkflow = await getWorkflowById(workflowId);
-                    if (existingWorkflow) {
-                        setWorkflowName(existingWorkflow.name || '제목 없는 워크플로우');
-                        const normalizedElements = CytoscapeComponent.normalizeElements(existingWorkflow.elements || []);
+                    const response = await getWorkflowById(workflowId);
+                    if (response.success) {
+                        setWorkflowName(response.workflow.name || '제목 없는 워크플로우');
+                        const normalizedElements = CytoscapeComponent.normalizeElements(response.workflow.elements || []);
                         setElements(normalizedElements);
-                        setSelectedNode(null); // 새 워크플로우 로드 시 선택 해제
+                        setSelectedNode(null);
 
                         if (cyRef.current) {
-                           setTimeout(() => { // Cytoscape 업데이트는 비동기적으로
+                           setTimeout(() => {
                                 if(cyRef.current) {
                                     cyRef.current.elements().remove();
                                     cyRef.current.add(normalizedElements);
@@ -75,13 +71,16 @@ function WorkflowPage() {
                                 }
                            }, 0);
                         }
-                    } else {
-                        alert(`ID '${workflowId}' 워크플로우를 찾을 수 없습니다.`);
-                        navigate('/workflow-builder'); // 새 워크플로우 페이지로 리디렉션
                     }
                 } catch (error) {
-                    alert(`워크플로우 '${workflowId}' 로드 중 오류: ${error.message}`);
-                    navigate('/workflow-builder');
+                    console.error('워크플로우 로드 실패:', error);
+                    if (error.message.includes('인증')) {
+                        alert('로그인이 필요합니다.');
+                        navigate('/login');
+                    } else {
+                        alert(`워크플로우 '${workflowId}' 로드 중 오류: ${error.message}`);
+                        navigate('/workflow-builder');
+                    }
                 } finally {
                     setIsLoading(false);
                 }

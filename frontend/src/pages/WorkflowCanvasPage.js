@@ -52,7 +52,7 @@ const WorkflowCanvasPage = () => {
         }
 
         const user = getCurrentUserData();
-        const userId = user?.user_id || user?.userId || user?.id;
+        const userId = user?.user_id;
         if (!userId) {
             alert('로그인 정보가 올바르지 않습니다. 다시 로그인 해주세요.');
             setIsSaving(false);

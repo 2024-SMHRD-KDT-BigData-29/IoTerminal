@@ -119,7 +119,7 @@ const DataAnalysisPage = () => {
                     <h3 className="text-lg font-semibold text-[#7e57c2] dark:text-[#b39ddb] mb-4">주요 인사이트</h3>
                     <div className="space-y-4">
                         {deviceData.insights.map((insight, index) => (
-                            <div key={index} className="p-4 bg-[#f8f6fc] dark:bg-[#2a2139] rounded-lg">
+                            <div key={insight.id || index} className="p-4 bg-[#f8f6fc] dark:bg-[#2a2139] rounded-lg">
                                 <p className="text-[#3a2e5a] dark:text-[#b39ddb]">
                                     {insight.message}
                                 </p>

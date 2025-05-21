@@ -7,6 +7,7 @@ const { Server } = require("socket.io");
 const authRoutes = require('./routes/authRoutes');
 const workflowRoutes = require('./routes/workflowRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const calendarRoutes = require('./routes/calendarRoutes');
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -42,6 +43,7 @@ app.use((req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/workflow', workflowRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/calendar', calendarRoutes);
 
 app.get('/', (req, res) => {
   res.send('IoT Hub System Backend - MOCKUP MODE');

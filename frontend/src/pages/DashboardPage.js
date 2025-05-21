@@ -26,6 +26,8 @@ import startOfWeek from 'date-fns/startOfWeek';
 import getDay from 'date-fns/getDay';
 import ko from 'date-fns/locale/ko';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
+import { getCalendarEvents, createCalendarEvent, updateCalendarEvent, deleteCalendarEvent } from '../services/calendarService';
+import { getCurrentUserData } from '../services/authService';
 
 const SOCKET_SERVER_URL = 'http://localhost:3001';
 const MAX_DATA_POINTS_LINE_CHART = 30;
@@ -64,20 +66,50 @@ function DashboardPage() {
     const [isLoading, setIsLoading] = useState(true);
     const navigate = useNavigate();
 
-    const [events, setEvents] = useState([
-        {
-            title: '디바이스 점검',
-            start: new Date(2024, 2, 15, 10, 0),
-            end: new Date(2024, 2, 15, 11, 0),
-            desc: 'IoT 디바이스 정기 점검',
-        },
-        {
-            title: '데이터 백업',
-            start: new Date(2024, 2, 16, 14, 0),
-            end: new Date(2024, 2, 16, 15, 0),
-            desc: '시스템 데이터 백업',
-        },
-    ]);
+    const [events, setEvents] = useState([]);
+    const [isLoadingEvents, setIsLoadingEvents] = useState(true);
+    const user = getCurrentUserData();
+    const userId = user?.user_id;  // user_id만 사용
+
+    // 캘린더 이벤트 로드
+    useEffect(() => {
+        const loadCalendarEvents = async () => {
+            try {
+                setIsLoadingEvents(true);
+                const response = await getCalendarEvents();
+                if (response.success) {
+                    const formattedEvents = response.events.map((event, idx) => ({
+                        ...event,
+                        id: event.id || `event-${event.start}-${event.end}-${idx}`,
+                        start: new Date(event.start),
+                        end: new Date(event.end)
+                    }));
+                    setEvents(formattedEvents);
+                }
+            } catch (error) {
+                console.error('일정 로드 실패:', error);
+            } finally {
+                setIsLoadingEvents(false);
+            }
+        };
+
+        loadCalendarEvents();
+    }, []);
+
+    // 이벤트가 변경될 때마다 로컬 스토리지에 저장
+    useEffect(() => {
+        localStorage.setItem('calendar_events', JSON.stringify(events));
+    }, [events]);
+
+    // 이벤트 추가 모달 상태
+    const [showEventModal, setShowEventModal] = useState(false);
+    const [selectedEvent, setSelectedEvent] = useState(null);
+    const [newEvent, setNewEvent] = useState({
+        title: '',
+        start: null,
+        end: null,
+        desc: ''
+    });
 
     // Fetch initial dashboard data from mock backend
     useEffect(() => {
@@ -145,19 +177,111 @@ function DashboardPage() {
         return Activity;
     };
 
-    const handleSelect = ({ start, end }) => {
-        const title = window.prompt('일정 제목을 입력하세요:');
-        if (title) {
-            setEvents([
-                ...events,
-                {
-                    title,
-                    start,
-                    end,
-                    desc: '새로운 일정',
-                },
-            ]);
+    // 이벤트 저장
+    const handleSaveEvent = async () => {
+        if (!userId) {
+            alert('로그인이 필요합니다.');
+            navigate('/login');
+            return;
         }
+
+        if (!newEvent.title || !newEvent.start || !newEvent.end) {
+            alert('제목, 시작 시간, 종료 시간은 필수 입력 항목입니다.');
+            return;
+        }
+
+        try {
+            const eventData = {
+                ...newEvent,
+                user_id: userId,
+                start: newEvent.start.toISOString(),
+                end: newEvent.end.toISOString()
+            };
+
+            let response;
+            if (selectedEvent) {
+                // 이벤트 수정
+                response = await updateCalendarEvent(selectedEvent.id, eventData);
+            } else {
+                // 새 이벤트 추가
+                response = await createCalendarEvent(eventData);
+            }
+
+            if (response.success) {
+                if (selectedEvent) {
+                    setEvents(events.map(event => 
+                        event.id === selectedEvent.id ? { ...eventData, id: event.id } : event
+                    ));
+                } else {
+                    setEvents([...events, { ...eventData, id: response.event.id }]);
+                }
+                setShowEventModal(false);
+                setSelectedEvent(null);
+                setNewEvent({ title: '', start: null, end: null, desc: '' });
+            }
+        } catch (error) {
+            console.error('일정 저장 실패:', error);
+            if (error.authError) {
+                alert('로그인이 필요합니다.');
+                navigate('/login');
+            } else {
+                alert(error.message || '일정 저장에 실패했습니다.');
+            }
+        }
+    };
+
+    // 이벤트 삭제
+    const handleDeleteEvent = async (eventId) => {
+        if (!userId) {
+            alert('로그인이 필요합니다.');
+            navigate('/login');
+            return;
+        }
+
+        if (!window.confirm('정말로 이 일정을 삭제하시겠습니까?')) {
+            return;
+        }
+
+        try {
+            const response = await deleteCalendarEvent(eventId);
+            if (response.success) {
+                setEvents(events.filter(event => event.id !== eventId));
+                setShowEventModal(false);
+                setSelectedEvent(null);
+            }
+        } catch (error) {
+            console.error('일정 삭제 실패:', error);
+            if (error.authError) {
+                alert('로그인이 필요합니다.');
+                navigate('/login');
+            } else {
+                alert(error.message || '일정 삭제에 실패했습니다.');
+            }
+        }
+    };
+
+    // 이벤트 선택 핸들러
+    const handleSelectEvent = (event) => {
+        setSelectedEvent(event);
+        setNewEvent({
+            title: event.title,
+            start: event.start,
+            end: event.end,
+            desc: event.desc
+        });
+        setShowEventModal(true);
+    };
+
+    // 새 이벤트 생성 핸들러
+    const handleSelect = ({ start, end }) => {
+        setSelectedEvent(null);
+        setNewEvent({
+            title: '',
+            start,
+            end,
+            desc: ''
+        });
+        setShowEventModal(true);
     };
 
     return (
@@ -242,9 +366,9 @@ function DashboardPage() {
                             </Link>
                         </div>
                         <div className="grid grid-cols-1 gap-2 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
-                            {sensorStatuses.length > 0 ? sensorStatuses.map((sensor, index) => (
+                            {sensorStatuses.length > 0 ? sensorStatuses.map((sensor, idx) => (
                                 <div 
-                                    key={index}
+                                    key={sensor.id || `sensor-${idx}`}
                                     className="bg-gray-50 dark:bg-[#2a2139] rounded-lg p-3 hover:bg-gray-100 dark:hover:bg-[#3a2e5a] transition-colors duration-200 cursor-pointer"
                                     onClick={() => navigate(`/iot/devices/${sensor.id}`)}
                                 >
@@ -286,30 +410,37 @@ function DashboardPage() {
                     <div className="bg-white dark:bg-[#3a2e5a] rounded-xl shadow-lg p-4">
                         <h3 className="text-lg font-semibold text-gray-700 dark:text-[#b39ddb] mb-4">일정 관리</h3>
                         <div className="h-[300px]">
-                            <Calendar
-                                localizer={localizer}
-                                events={events}
-                                startAccessor="start"
-                                endAccessor="end"
-                                style={{ height: '100%' }}
-                                onSelectSlot={handleSelect}
-                                selectable
-                                views={['month', 'week', 'day']}
-                                messages={{
-                                    next: "다음",
-                                    previous: "이전",
-                                    today: "오늘",
-                                    month: "월",
-                                    week: "주",
-                                    day: "일",
-                                    agenda: "일정",
-                                    date: "날짜",
-                                    time: "시간",
-                                    event: "일정",
-                                    noEventsInRange: "일정이 없습니다.",
-                                }}
-                                className="dark:bg-[#2a2139] dark:text-[#b39ddb]"
-                            />
+                            {isLoadingEvents ? (
+                                <div className="h-full flex items-center justify-center">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400"></div>
+                                </div>
+                            ) : (
+                                <Calendar
+                                    localizer={localizer}
+                                    events={events}
+                                    startAccessor="start"
+                                    endAccessor="end"
+                                    style={{ height: '100%' }}
+                                    onSelectSlot={handleSelect}
+                                    onSelectEvent={handleSelectEvent}
+                                    selectable
+                                    views={['month', 'week', 'day']}
+                                    messages={{
+                                        next: "다음",
+                                        previous: "이전",
+                                        today: "오늘",
+                                        month: "월",
+                                        week: "주",
+                                        day: "일",
+                                        agenda: "일정",
+                                        date: "날짜",
+                                        time: "시간",
+                                        event: "일정",
+                                        noEventsInRange: "일정이 없습니다.",
+                                    }}
+                                    className="dark:bg-[#2a2139] dark:text-[#b39ddb]"
+                                />
+                            )}
                         </div>
                     </div>
                 </div>
@@ -332,9 +463,9 @@ function DashboardPage() {
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400"></div>
                         </div>
                     ) : recentWorkflows.length > 0 ? (
-                        recentWorkflows.map((workflow) => (
+                        recentWorkflows.map((workflow, idx) => (
                             <div 
-                                key={workflow.workflow_id}
+                                key={workflow.workflow_id || `workflow-${idx}`}
                                 className="bg-[#f8f6fc] dark:bg-[#2a2139] rounded-lg p-4 cursor-pointer hover:bg-[#ede7f6] dark:hover:bg-[#3a2e5a] transition-colors duration-200"
                                 onClick={() => navigate(`/workflow/edit/${workflow.workflow_id}`)}
                             >
@@ -353,6 +484,85 @@ function DashboardPage() {
                     )}
                 </div>
             </div>
+
+            {/* 이벤트 모달 */}
+            {showEventModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white dark:bg-[#3a2e5a] rounded-xl p-6 w-full max-w-md">
+                        <h3 className="text-lg font-semibold text-gray-700 dark:text-[#b39ddb] mb-4">
+                            {selectedEvent ? '일정 수정' : '새 일정'}
+                        </h3>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-[#b39ddb] mb-1">
+                                    제목
+                                </label>
+                                <input
+                                    type="text"
+                                    value={newEvent.title}
+                                    onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
+                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-[#4a3f6d] bg-white dark:bg-[#2a2139] text-gray-700 dark:text-[#b39ddb]"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-[#b39ddb] mb-1">
+                                    시작 시간
+                                </label>
+                                <input
+                                    type="datetime-local"
+                                    value={newEvent.start ? newEvent.start.toISOString().slice(0, 16) : ''}
+                                    onChange={(e) => setNewEvent({ ...newEvent, start: new Date(e.target.value) })}
+                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-[#4a3f6d] bg-white dark:bg-[#2a2139] text-gray-700 dark:text-[#b39ddb]"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-[#b39ddb] mb-1">
+                                    종료 시간
+                                </label>
+                                <input
+                                    type="datetime-local"
+                                    value={newEvent.end ? newEvent.end.toISOString().slice(0, 16) : ''}
+                                    onChange={(e) => setNewEvent({ ...newEvent, end: new Date(e.target.value) })}
+                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-[#4a3f6d] bg-white dark:bg-[#2a2139] text-gray-700 dark:text-[#b39ddb]"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-[#b39ddb] mb-1">
+                                    설명
+                                </label>
+                                <textarea
+                                    value={newEvent.desc}
+                                    onChange={(e) => setNewEvent({ ...newEvent, desc: e.target.value })}
+                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-[#4a3f6d] bg-white dark:bg-[#2a2139] text-gray-700 dark:text-[#b39ddb]"
+                                    rows="3"
+                                />
+                            </div>
+                        </div>
+                        <div className="flex justify-end space-x-2 mt-6">
+                            {selectedEvent && (
+                                <button
+                                    onClick={() => handleDeleteEvent(selectedEvent.id)}
+                                    className="px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg"
+                                >
+                                    삭제
+                                </button>
+                            )}
+                            <button
+                                onClick={() => setShowEventModal(false)}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-[#b39ddb] hover:bg-gray-100 dark:hover:bg-[#4a3f6d] rounded-lg"
+                            >
+                                취소
+                            </button>
+                            <button
+                                onClick={handleSaveEvent}
+                                className="px-4 py-2 text-sm font-medium text-white bg-purple-600 dark:bg-purple-500 hover:bg-purple-700 dark:hover:bg-purple-600 rounded-lg"
+                            >
+                                저장
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
