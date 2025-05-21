@@ -88,10 +88,10 @@ const WorkflowCanvasPage = () => {
 
             console.log('저장될 워크플로우 데이터:', workflowData);
 
-            let response;
+            let data;
             if (workflowId) {
                 // 기존 워크플로우 업데이트
-                response = await fetch(`${API_URL}/workflow/${workflowId}`, {
+                const response = await fetch(`${API_URL}/workflow/${workflowId}`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
@@ -99,12 +99,12 @@ const WorkflowCanvasPage = () => {
                     },
                     body: JSON.stringify(workflowData)
                 });
+                data = await response.json();
             } else {
                 // 새 워크플로우 생성
-                response = await saveWorkflow(workflowData);
+                data = await saveWorkflow(workflowData);
             }
 
-            const data = await response.json();
             if (data.success) {
                 alert('워크플로우가 저장되었습니다.');
                 navigate('/workflow');
