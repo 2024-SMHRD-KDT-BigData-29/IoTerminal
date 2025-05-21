@@ -9,7 +9,7 @@
 // 해당 컴포넌트들을 사용하여 UI를 구성합니다.
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom'; // Link 임포트 추가
+import { Link, useNavigate } from 'react-router-dom'; // Link 임포트 추가
 import { 
     LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
@@ -18,6 +18,7 @@ import {
     Activity, Database, Shield, Globe, Thermometer, Droplet, Zap, Wind, AlertTriangle
 } from 'lucide-react';
 import { getDashboardSummary, getSensorStatuses, getRecentWorkflowsForDashboard, getApiStatusesForDashboard } from '../services/dashboardService';
+import { getRecentWorkflows } from '../api/workflow';
 
 const SOCKET_SERVER_URL = 'http://localhost:3001';
 const MAX_DATA_POINTS_LINE_CHART = 30;
@@ -41,6 +42,8 @@ function DashboardPage() {
     const [recentWorkflows, setRecentWorkflows] = useState([]);
     const [apiStatuses, setApiStatuses] = useState([]);
     const [dateRangeFilter, setDateRangeFilter] = useState('today'); // For chart filter
+    const [isLoading, setIsLoading] = useState(true);
+    const navigate = useNavigate();
 
     // Fetch initial dashboard data from mock backend
     useEffect(() => {
@@ -79,6 +82,23 @@ function DashboardPage() {
             });
         });
         return () => { if (socketRef.current) socketRef.current.disconnect(); };
+    }, []);
+
+    useEffect(() => {
+        const fetchRecentWorkflows = async () => {
+            try {
+                const response = await getRecentWorkflows();
+                if (response.success) {
+                    setRecentWorkflows(response.workflows);
+                }
+            } catch (error) {
+                console.error('최근 워크플로우 조회 실패:', error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchRecentWorkflows();
     }, []);
 
     const getIconComponentForSensor = (sensorName = "") => { // Returns Component Type
@@ -176,15 +196,32 @@ function DashboardPage() {
                         <Link to="/workflow/new" className="text-sky-600 hover:text-sky-700 text-sm font-medium">새로 만들기</Link>
                     </div>
                     <div className="space-y-1 max-h-72 overflow-y-auto custom-scrollbar">
-                        {recentWorkflows.length > 0 ? recentWorkflows.map((wf, index) => (
-                            <WorkflowItem 
-                                key={index} 
-                                name={wf.name} 
-                                time={wf.time} 
-                                status={wf.status} 
-                                statusColor={wf.statusColor} 
-                            />
-                        )) : <p className="text-sm text-gray-500 py-4 text-center">최근 워크플로우 활동 없음.</p>}
+                        {isLoading ? (
+                            <div className="flex justify-center">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400"></div>
+                            </div>
+                        ) : recentWorkflows.length > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {recentWorkflows.map((workflow) => (
+                                    <div 
+                                        key={workflow.workflow_id}
+                                        className="bg-[#f8f6fc] dark:bg-[#2a2139] rounded-lg p-4 cursor-pointer hover:bg-[#ede7f6] dark:hover:bg-[#3a2e5a] transition-colors duration-200"
+                                        onClick={() => navigate(`/workflow/edit/${workflow.workflow_id}`)}
+                                    >
+                                        <h3 className="font-medium text-[#3a2e5a] dark:text-[#b39ddb] mb-2">
+                                            {workflow.name}
+                                        </h3>
+                                        <p className="text-sm text-[#9575cd] dark:text-[#b39ddb]">
+                                            마지막 수정: {new Date(workflow.updated_at).toLocaleDateString()}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-[#9575cd] dark:text-[#b39ddb] text-center">
+                                최근 워크플로우가 없습니다.
+                            </p>
+                        )}
                     </div>
                 </div>
             </div>

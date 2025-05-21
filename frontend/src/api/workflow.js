@@ -99,4 +99,31 @@ export const deleteWorkflow = async (workflowId) => {
     console.error('워크플로우 삭제 오류:', error);
     throw error;
   }
+};
+
+// 최근 워크플로우 조회
+export const getRecentWorkflows = async () => {
+  try {
+    const token = sessionStorage.getItem('token');
+    if (!token) {
+      throw new Error('인증 토큰이 없습니다. 다시 로그인해주세요.');
+    }
+
+    const response = await fetch(`${API_URL}/workflow/list?limit=3`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.message || '최근 워크플로우 조회에 실패했습니다.');
+    }
+
+    return data;
+  } catch (error) {
+    console.error('최근 워크플로우 조회 오류:', error);
+    throw error;
+  }
 }; 

@@ -6,7 +6,8 @@ const {
     getUserWorkflows,
     getWorkflowById,
     updateWorkflow,
-    deleteWorkflow 
+    deleteWorkflow,
+    getRecentWorkflows
 } = require('../controllers/workflowController');
 
 const JWT_SECRET = 'mock-jwt-secret-for-presentation';
@@ -42,6 +43,7 @@ router.use(authenticateToken);
 // 워크플로우 라우트
 router.post('/save', createWorkflow);
 router.get('/list', getUserWorkflows);
+router.get('/recent', getRecentWorkflows);
 router.get('/:workflowId', getWorkflowById);
 router.put('/:workflowId', updateWorkflow);
 router.delete('/:workflowId', deleteWorkflow);

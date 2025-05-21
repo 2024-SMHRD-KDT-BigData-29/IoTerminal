@@ -56,10 +56,17 @@ exports.createWorkflow = async (req, res) => {
 exports.getUserWorkflows = async (req, res) => {
     try {
         const userId = req.user.userId;
-        const [workflows] = await pool.execute(
-            'SELECT workflow_id, name, description, created_at, updated_at, is_public FROM workflows WHERE user_id = ? OR is_public = true ORDER BY updated_at DESC',
-            [userId]
-        );
+        const limit = req.query.limit ? parseInt(req.query.limit) : null;
+        
+        let query = 'SELECT workflow_id, name, description, created_at, updated_at, is_public FROM workflows WHERE user_id = ? OR is_public = true ORDER BY updated_at DESC';
+        let params = [userId];
+
+        if (limit) {
+            query += ' LIMIT ?';
+            params.push(limit);
+        }
+
+        const [workflows] = await pool.execute(query, params);
 
         res.json({
             success: true,
@@ -213,6 +220,27 @@ exports.deleteWorkflow = async (req, res) => {
         res.status(500).json({
             success: false,
             message: '워크플로우 삭제 중 오류가 발생했습니다.'
+        });
+    }
+};
+
+exports.getRecentWorkflows = async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        const [workflows] = await pool.execute(
+            'SELECT workflow_id, name, description, created_at, updated_at, is_public FROM workflows WHERE user_id = ? OR is_public = true ORDER BY updated_at DESC LIMIT 3',
+            [userId]
+        );
+
+        res.json({
+            success: true,
+            workflows
+        });
+    } catch (error) {
+        console.error('최근 워크플로우 조회 실패:', error);
+        res.status(500).json({
+            success: false,
+            message: '최근 워크플로우 조회 중 오류가 발생했습니다.'
         });
     }
 };
