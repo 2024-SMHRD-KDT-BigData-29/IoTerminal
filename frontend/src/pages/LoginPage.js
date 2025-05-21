@@ -14,7 +14,10 @@ const LoginPage = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            await login(email, password);
+            const result = await login(email, password);
+            // 사용자 정보 localStorage에 저장
+            localStorage.setItem('user', JSON.stringify(result.user));
+            localStorage.setItem('token', result.token);
             navigate('/dashboard');
         } catch (err) {
             setError('이메일 또는 비밀번호가 올바르지 않습니다.');

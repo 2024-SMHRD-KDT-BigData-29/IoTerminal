@@ -21,8 +21,8 @@ function WorkflowPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
 
-    const currentUserData = getCurrentUserData();
-    const username = currentUserData?.username || '사용자';
+    const user = getCurrentUserData();
+    const userId = user?.userId || user?.id;
 
     const [showImportModal, setShowImportModal] = useState(false);
 
@@ -31,7 +31,7 @@ function WorkflowPage() {
     const fetchWorkflows = async () => {
         try {
             setIsLoading(true);
-            const response = await getWorkflowList(1); // TODO: 실제 사용자 ID로 변경
+            const response = await getWorkflowList(userId);
             if (response.success) {
                 setWorkflows(response.workflows);
             }
@@ -44,7 +44,7 @@ function WorkflowPage() {
 
     useEffect(() => {
         fetchWorkflows();
-    }, []);
+    }, [userId]);
 
     // 워크플로우 로드 또는 새 워크플로우 초기화
     useEffect(() => {

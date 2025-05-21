@@ -13,8 +13,7 @@ import SettingsPage from './pages/SettingsPage';
 import { getCurrentUserToken } from './services/authService';
 
 const PrivateRoutes = () => {
-    // const isAuthenticated = !!getCurrentUserToken();
-    const isAuthenticated = true;
+    const isAuthenticated = !!getCurrentUserToken();
     return isAuthenticated ? <MainLayout /> : <Navigate to="/login" replace />;
 };
 

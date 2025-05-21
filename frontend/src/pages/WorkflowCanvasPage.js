@@ -5,6 +5,7 @@ import WorkflowCanvas from '../components/workflow/WorkflowCanvas';
 import NodePalette from '../components/workflow/NodePalette';
 import PropertyEditor from '../components/workflow/PropertyEditor';
 import { saveWorkflow, getWorkflowById } from '../api/workflow';
+import { getCurrentUserData } from '../services/authService';
 
 const WorkflowCanvasPage = () => {
     const [elements, setElements] = useState([]);
@@ -41,6 +42,14 @@ const WorkflowCanvasPage = () => {
             return;
         }
 
+        const user = getCurrentUserData();
+        const userId = user?.userId || user?.id;
+        if (!userId) {
+            alert('로그인 정보가 올바르지 않습니다. 다시 로그인 해주세요.');
+            setIsSaving(false);
+            return;
+        }
+
         setIsSaving(true);
         try {
             let nodes = elements.filter(el => el.group === 'nodes');
@@ -64,7 +73,7 @@ const WorkflowCanvasPage = () => {
                 description: '',
                 nodes: nodes,
                 edges: edges,
-                userId: 1, // TODO: 실제 사용자 ID로 변경
+                userId: userId,
                 isPublic: false
             };
 
@@ -73,9 +82,7 @@ const WorkflowCanvasPage = () => {
             const response = await saveWorkflow(workflowData);
             if (response.success) {
                 alert('워크플로우가 저장되었습니다.');
-                if (!workflowId) {
-                    navigate(`/workflow/${response.workflowId}`);
-                }
+                navigate('/workflow'); // 워크플로우 목록으로 이동
             }
         } catch (error) {
             console.error('워크플로우 저장 실패:', error);

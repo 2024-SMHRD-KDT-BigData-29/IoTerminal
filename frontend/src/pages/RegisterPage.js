@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
-import { register } from '../services/authService';
+import { register, login } from '../services/authService';
 
 // DatePicker 커스텀 스타일
 const customDatePickerStyles = {
@@ -97,22 +97,18 @@ const RegisterPage = () => {
         e.preventDefault();
         setError('');
 
-        // 폼에서 직접 비밀번호와 비밀번호 확인 값을 가져와 비교
-        const password = e.target.password.value;
-        const confirmPassword = e.target.confirmPassword.value;
-
-        console.log('Password:', password, 'Type:', typeof password, 'Length:', password.length);
-        console.log('Confirm Password:', confirmPassword, 'Type:', typeof confirmPassword, 'Length:', confirmPassword.length);
-        console.log('Passwords match check:', password === confirmPassword);
-
-        if (password !== confirmPassword) {
+        if (formData.password !== formData.confirmPassword) {
             setError('비밀번호가 일치하지 않습니다.');
             return;
         }
 
         try {
             await register(formData);
-            navigate('/login');
+            // 회원가입 성공 후 자동 로그인
+            const result = await login(formData.email, formData.password);
+            localStorage.setItem('user', JSON.stringify(result.user));
+            localStorage.setItem('token', result.token);
+            navigate('/dashboard'); // 또는 워크플로우 페이지 등
         } catch (err) {
             setError(err.message || '회원가입에 실패했습니다.');
         }

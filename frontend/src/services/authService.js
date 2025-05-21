@@ -45,11 +45,12 @@ export const register = async (userData) => {
 };
 
 export const getCurrentUserToken = () => {
-    return 'dummy-token';
+    return localStorage.getItem('token');
 };
 
 export const getCurrentUserData = () => {
-    return { username: '사용자', name: '사용자', email: 'user@example.com' };
+    const user = localStorage.getItem('user');
+    return user ? JSON.parse(user) : null;
 };
 
 export const logout = () => {
