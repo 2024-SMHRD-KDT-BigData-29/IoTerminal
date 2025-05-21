@@ -18,7 +18,7 @@ router.post('/save', async (req, res) => {
       message: '워크플로우가 저장되었습니다.'
     });
   } catch (error) {
-    console.error('워크플로우 저장 실패:', error, req.body);
+    console.error('워크플로우 저장 실패:', error);
     res.status(500).json({ 
       success: false, 
       error: '워크플로우 저장에 실패했습니다.' 

@@ -51,6 +51,7 @@ const RegisterPage = () => {
         password: '',
         confirmPassword: '',
         email: '',
+        phone: '',
         gender: '',
         name: '',
         birthDate: null,
@@ -216,6 +217,22 @@ const RegisterPage = () => {
                                 onChange={handleChange}
                                 className="mt-1 block w-full px-4 py-3 rounded-xl border border-[#d1c4e9] dark:border-[#9575cd] bg-white dark:bg-[#2a2139] text-[#3a2e5a] dark:text-[#b39ddb] placeholder-[#9575cd] dark:placeholder-[#b39ddb] focus:ring-2 focus:ring-[#7e57c2] dark:focus:ring-[#9575cd] focus:border-transparent transition-colors duration-200"
                                 placeholder="이메일을 입력하세요"
+                            />
+                        </div>
+
+                        <div>
+                            <label htmlFor="phone" className="block text-sm font-medium text-[#3a2e5a] dark:text-[#b39ddb]">
+                                휴대폰 번호
+                            </label>
+                            <input
+                                id="phone"
+                                name="phone"
+                                type="tel"
+                                required
+                                value={formData.phone}
+                                onChange={handleChange}
+                                className="mt-1 block w-full px-4 py-3 rounded-xl border border-[#d1c4e9] dark:border-[#9575cd] bg-white dark:bg-[#2a2139] text-[#3a2e5a] dark:text-[#b39ddb] placeholder-[#9575cd] dark:placeholder-[#b39ddb] focus:ring-2 focus:ring-[#7e57c2] dark:focus:ring-[#9575cd] focus:border-transparent transition-colors duration-200"
+                                placeholder="휴대폰 번호를 입력하세요"
                             />
                         </div>
 

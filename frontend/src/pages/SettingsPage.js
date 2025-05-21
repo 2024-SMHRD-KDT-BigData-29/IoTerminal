@@ -12,7 +12,6 @@ const defaultSettings = {
 const defaultAccount = {
     name: '홍길동',
     email: 'hong@ioterminal.com',
-    phone: '010-1234-5678',
     address: '서울시 강남구',
     password: '',
     newPassword: '',
