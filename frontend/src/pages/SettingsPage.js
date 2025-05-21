@@ -1,6 +1,7 @@
 // File: frontend/src/pages/SettingsPage.js
 import React, { useState, useEffect } from 'react';
 import { Settings } from 'lucide-react';
+import { getCurrentUserData } from '../services/authService';
 
 const defaultSettings = {
     emailNotification: true,
@@ -10,9 +11,10 @@ const defaultSettings = {
     dndEnd: '07:00',
 };
 const defaultAccount = {
-    name: '홍길동',
-    email: 'hong@ioterminal.com',
-    address: '서울시 강남구',
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
     password: '',
     newPassword: '',
     confirmPassword: '',
@@ -32,8 +34,17 @@ const SettingsPage = () => {
     useEffect(() => {
         const savedSettings = localStorage.getItem(LOCAL_KEY);
         if (savedSettings) setSettings(JSON.parse(savedSettings));
-        const savedAccount = localStorage.getItem(ACCOUNT_KEY);
-        if (savedAccount) setAccount(JSON.parse(savedAccount));
+        
+        // 로그인된 사용자 정보 가져오기
+        const currentUser = getCurrentUserData();
+        if (currentUser) {
+            setAccount(prev => ({
+                ...prev,
+                name: currentUser.name || '',
+                email: currentUser.email || '',
+                phone: currentUser.phone || ''
+            }));
+        }
     }, []);
 
     // 알림 설정 핸들러
@@ -208,37 +219,38 @@ const SettingsPage = () => {
                                 onChange={e => handleAccountChange('address', e.target.value)}
                                 className="w-full px-3 py-2 border border-[#b39ddb] rounded-md bg-white dark:bg-[#2a2139] text-[#3a2e5a] dark:text-[#b39ddb]"
                                 placeholder="주소를 입력하세요"
+                                autoComplete="off"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-[#7e57c2] mb-1">새 비밀번호</label>
+                            <label className="block text-sm font-medium text-[#7e57c2] mb-1">수정할 비밀번호</label>
                             <input
                                 type="password"
                                 value={account.newPassword}
                                 onChange={e => handleAccountChange('newPassword', e.target.value)}
                                 className="w-full px-3 py-2 border border-[#b39ddb] rounded-md bg-white dark:bg-[#2a2139] text-[#3a2e5a] dark:text-[#b39ddb]"
-                                placeholder="새 비밀번호를 입력하세요"
+                                autoComplete="new-password"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-[#7e57c2] mb-1">비밀번호 확인</label>
+                            <label className="block text-sm font-medium text-[#7e57c2] mb-1">수정할 비밀번호 확인</label>
                             <input
                                 type="password"
                                 value={account.confirmPassword}
                                 onChange={e => handleAccountChange('confirmPassword', e.target.value)}
                                 className="w-full px-3 py-2 border border-[#b39ddb] rounded-md bg-white dark:bg-[#2a2139] text-[#3a2e5a] dark:text-[#b39ddb]"
-                                placeholder="비밀번호를 다시 입력하세요"
+                                autoComplete="new-password"
                             />
+                            {passwordMatchError && <div className="mt-1 text-red-500 text-sm">{passwordMatchError}</div>}
                         </div>
                     </div>
-                    {passwordMatchError && <div className="mt-3 text-red-600 dark:text-red-400 text-center text-sm">{passwordMatchError}</div>}
                     <button
                         onClick={handleAccountSave}
                         className="mt-8 w-full py-3 rounded-xl bg-[#7e57c2] dark:bg-[#9575cd] text-white font-semibold text-lg shadow hover:bg-[#5e35b1] dark:hover:bg-[#b39ddb] transition-colors duration-200"
                     >
-                        저장
+                        수정
                     </button>
-                    {accountSaved && <div className="mt-3 text-green-600 dark:text-green-400 text-center text-sm">계정 정보가 저장되었습니다.</div>}
+                    {accountSaved && <div className="mt-3 text-green-600 dark:text-green-400 text-center text-sm">계정 정보가 수정되었습니다.</div>}
                     {accountError && <div className="mt-3 text-red-600 dark:text-red-400 text-center text-sm">{accountError}</div>}
                 </div>
             )}

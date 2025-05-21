@@ -104,11 +104,9 @@ const RegisterPage = () => {
 
         try {
             await register(formData);
-            // 회원가입 성공 후 자동 로그인
-            const result = await login(formData.email, formData.password);
-            localStorage.setItem('user', JSON.stringify(result.user));
-            localStorage.setItem('token', result.token);
-            navigate('/dashboard'); // 또는 워크플로우 페이지 등
+            // 회원가입 성공 후 로그인 페이지로 이동
+            alert('회원가입이 완료되었습니다. 로그인 페이지로 이동합니다.');
+            navigate('/login');
         } catch (err) {
             setError(err.message || '회원가입에 실패했습니다.');
         }
@@ -155,6 +153,7 @@ const RegisterPage = () => {
                                 onChange={handleChange}
                                 className="mt-1 block w-full px-4 py-3 rounded-xl border border-[#d1c4e9] dark:border-[#9575cd] bg-white dark:bg-[#2a2139] text-[#3a2e5a] dark:text-[#b39ddb] placeholder-[#9575cd] dark:placeholder-[#b39ddb] focus:ring-2 focus:ring-[#7e57c2] dark:focus:ring-[#9575cd] focus:border-transparent transition-colors duration-200"
                                 placeholder="아이디를 입력하세요"
+                                autoComplete="off"
                             />
                         </div>
 
@@ -172,6 +171,7 @@ const RegisterPage = () => {
                                     onChange={handleChange}
                                     className="block w-full px-4 py-3 rounded-xl border border-[#d1c4e9] dark:border-[#9575cd] bg-white dark:bg-[#2a2139] text-[#3a2e5a] dark:text-[#b39ddb] placeholder-[#9575cd] dark:placeholder-[#b39ddb] focus:ring-2 focus:ring-[#7e57c2] dark:focus:ring-[#9575cd] focus:border-transparent transition-colors duration-200"
                                     placeholder="비밀번호를 입력하세요"
+                                    autoComplete="new-password"
                                 />
                                 <button
                                     type="button"
@@ -197,6 +197,7 @@ const RegisterPage = () => {
                                     onChange={handleChange}
                                     className="block w-full px-4 py-3 rounded-xl border border-[#d1c4e9] dark:border-[#9575cd] bg-white dark:bg-[#2a2139] text-[#3a2e5a] dark:text-[#b39ddb] placeholder-[#9575cd] dark:placeholder-[#b39ddb] focus:ring-2 focus:ring-[#7e57c2] dark:focus:ring-[#9575cd] focus:border-transparent transition-colors duration-200"
                                     placeholder="비밀번호를 다시 입력하세요"
+                                    autoComplete="new-password"
                                 />
                                 <button
                                     type="button"
@@ -221,6 +222,7 @@ const RegisterPage = () => {
                                 onChange={handleChange}
                                 className="mt-1 block w-full px-4 py-3 rounded-xl border border-[#d1c4e9] dark:border-[#9575cd] bg-white dark:bg-[#2a2139] text-[#3a2e5a] dark:text-[#b39ddb] placeholder-[#9575cd] dark:placeholder-[#b39ddb] focus:ring-2 focus:ring-[#7e57c2] dark:focus:ring-[#9575cd] focus:border-transparent transition-colors duration-200"
                                 placeholder="이메일을 입력하세요"
+                                autoComplete="off"
                             />
                         </div>
 
@@ -237,6 +239,7 @@ const RegisterPage = () => {
                                 onChange={handleChange}
                                 className="mt-1 block w-full px-4 py-3 rounded-xl border border-[#d1c4e9] dark:border-[#9575cd] bg-white dark:bg-[#2a2139] text-[#3a2e5a] dark:text-[#b39ddb] placeholder-[#9575cd] dark:placeholder-[#b39ddb] focus:ring-2 focus:ring-[#7e57c2] dark:focus:ring-[#9575cd] focus:border-transparent transition-colors duration-200"
                                 placeholder="휴대폰 번호를 입력하세요"
+                                autoComplete="off"
                             />
                         </div>
 
@@ -283,6 +286,7 @@ const RegisterPage = () => {
                                 onChange={handleChange}
                                 className="mt-1 block w-full px-4 py-3 rounded-xl border border-[#d1c4e9] dark:border-[#9575cd] bg-white dark:bg-[#2a2139] text-[#3a2e5a] dark:text-[#b39ddb] placeholder-[#9575cd] dark:placeholder-[#b39ddb] focus:ring-2 focus:ring-[#7e57c2] dark:focus:ring-[#9575cd] focus:border-transparent transition-colors duration-200"
                                 placeholder="이름을 입력하세요"
+                                autoComplete="off"
                             />
                         </div>
 
@@ -319,6 +323,7 @@ const RegisterPage = () => {
                                 onChange={handleChange}
                                 className="mt-1 block w-full px-4 py-3 rounded-xl border border-[#d1c4e9] dark:border-[#9575cd] bg-white dark:bg-[#2a2139] text-[#3a2e5a] dark:text-[#b39ddb] placeholder-[#9575cd] dark:placeholder-[#b39ddb] focus:ring-2 focus:ring-[#7e57c2] dark:focus:ring-[#9575cd] focus:border-transparent transition-colors duration-200"
                                 placeholder="주소를 입력하세요"
+                                autoComplete="off"
                             />
                         </div>
                     </div>
