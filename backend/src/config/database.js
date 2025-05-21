@@ -1,6 +1,7 @@
 const mysql = require('mysql2/promise');
 
 const pool = mysql.createPool({
+
     host: 'project-db-campus.smhrd.com',
     port: 3312,
     user: 'mp_24K_bigdata29_p3_1',  // MySQL 사용자 이름
@@ -20,6 +21,7 @@ console.log('Database configuration loaded:', {
     port: pool.pool.config.connectionConfig.port,
     user: pool.pool.config.connectionConfig.user,
     database: pool.pool.config.connectionConfig.database
+
 });
 
 module.exports = pool; 

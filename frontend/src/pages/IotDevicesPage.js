@@ -7,7 +7,7 @@ const IotDevicesPage = () => {
         <div>
             <div className="flex items-center space-x-3 mb-6 border-b pb-4">
                 <IconBarChart size={32} className="text-purple-600" /> {/* Using the aliased import */}
-                <h2 className="text-2xl font-semibold text-gray-800">IoT 디바이스 관리</h2>
+                <h2 className="text-2xl font-semibold text-gray-800 dark:text-[#b39ddb]">IoT 디바이스 관리</h2>
             </div>
              <div className="bg-white p-8 rounded-xl shadow-lg">
                 <p className="text-gray-700">

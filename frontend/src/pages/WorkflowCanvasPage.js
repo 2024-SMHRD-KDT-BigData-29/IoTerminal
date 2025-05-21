@@ -1,21 +1,88 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Plus, Save, Trash2, Upload } from 'lucide-react';
 import WorkflowCanvas from '../components/workflow/WorkflowCanvas';
 import NodePalette from '../components/workflow/NodePalette';
 import PropertyEditor from '../components/workflow/PropertyEditor';
+import { saveWorkflow, getWorkflowById } from '../api/workflow';
 
 const WorkflowCanvasPage = () => {
     const [elements, setElements] = useState([]);
     const [selectedNode, setSelectedNode] = useState(null);
     const [workflowName, setWorkflowName] = useState('새 워크플로우');
     const [showImportModal, setShowImportModal] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
     const navigate = useNavigate();
     const { workflowId } = useParams();
+    const cyRef = useRef(null);
+
+    // 워크플로우 불러오기
+    useEffect(() => {
+        if (workflowId) {
+            const fetchWorkflow = async () => {
+                try {
+                    const response = await getWorkflowById(workflowId);
+                    if (response.success) {
+                        setWorkflowName(response.workflow.name);
+                        setElements([...response.workflow.nodes, ...response.workflow.edges]);
+                    }
+                } catch (error) {
+                    console.error('워크플로우 불러오기 실패:', error);
+                    alert('워크플로우를 불러오는데 실패했습니다.');
+                }
+            };
+            fetchWorkflow();
+        }
+    }, [workflowId]);
 
     const handleSaveWorkflow = async () => {
-        // TODO: API 호출하여 워크플로우 저장
-        console.log('Saving workflow:', { name: workflowName, elements });
+        if (!workflowName.trim()) {
+            alert('워크플로우 이름을 입력해주세요.');
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            let nodes = elements.filter(el => el.group === 'nodes');
+            let edges = elements.filter(el => el.group === 'edges');
+
+            // position 정보가 없는 노드가 있으면 Cytoscape에서 가져와서 추가
+            if (cyRef.current) {
+                nodes = nodes.map(node => {
+                    if (!node.position) {
+                        const cyNode = cyRef.current.getElementById(node.data.id);
+                        if (cyNode && cyNode.position) {
+                            return { ...node, position: cyNode.position() };
+                        }
+                    }
+                    return node;
+                });
+            }
+
+            const workflowData = {
+                name: workflowName,
+                description: '',
+                nodes: nodes,
+                edges: edges,
+                userId: 1, // TODO: 실제 사용자 ID로 변경
+                isPublic: false
+            };
+
+            console.log('저장될 워크플로우 데이터:', workflowData); // 디버깅용
+
+            const response = await saveWorkflow(workflowData);
+            if (response.success) {
+                alert('워크플로우가 저장되었습니다.');
+                if (!workflowId) {
+                    navigate(`/workflow/${response.workflowId}`);
+                }
+            }
+        } catch (error) {
+            console.error('워크플로우 저장 실패:', error);
+            alert('워크플로우 저장에 실패했습니다.');
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const handleClearCanvas = () => {
@@ -47,8 +114,53 @@ const WorkflowCanvasPage = () => {
         }
     };
 
+    const handleCyInit = (cy) => {
+        cyRef.current = cy;
+        
+        // 노드 클릭 이벤트 처리
+        cy.on('tap', 'node', (evt) => {
+            const node = evt.target;
+            setSelectedNode({
+                id: node.id(),
+                data: node.data()
+            });
+        });
+
+        // 캔버스 클릭 시 선택 해제
+        cy.on('tap', (evt) => {
+            if (evt.target === cy) {
+                setSelectedNode(null);
+            }
+        });
+    };
+
+    const handleUpdateNode = (nodeId, updatedProps) => {
+        setElements(currentElements =>
+            currentElements.map(el => {
+                if (el.data.id === nodeId) {
+                    return {
+                        ...el,
+                        data: {
+                            ...el.data,
+                            ...updatedProps
+                        }
+                    };
+                }
+                return el;
+            })
+        );
+
+        // Cytoscape 그래프 업데이트
+        if (cyRef.current) {
+            const node = cyRef.current.getElementById(nodeId);
+            if (node.length > 0) {
+                node.data(updatedProps);
+            }
+        }
+    };
+
     return (
-        <div className="h-full flex flex-col">
+        <div className="h-[calc(100vh-80px)] min-h-[600px] flex flex-col">
             {/* 상단 툴바 */}
             <div className="bg-white dark:bg-[#3a2e5a] shadow-sm p-4 flex items-center justify-between">
                 <div className="flex items-center space-x-4">
@@ -62,10 +174,11 @@ const WorkflowCanvasPage = () => {
                 <div className="flex items-center space-x-2">
                     <button
                         onClick={handleSaveWorkflow}
-                        className="flex items-center px-3 py-2 bg-[#7e57c2] dark:bg-[#9575cd] text-white rounded-xl hover:bg-[#5e35b1] dark:hover:bg-[#b39ddb] transition-colors duration-200"
+                        disabled={isSaving}
+                        className={`flex items-center px-3 py-2 bg-[#7e57c2] dark:bg-[#9575cd] text-white rounded-xl hover:bg-[#5e35b1] dark:hover:bg-[#b39ddb] transition-colors duration-200 ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                         <Save size={20} className="mr-2" />
-                        저장
+                        {isSaving ? '저장 중...' : '저장'}
                     </button>
                     <button
                         onClick={handleImportWorkflow}
@@ -85,19 +198,19 @@ const WorkflowCanvasPage = () => {
             </div>
 
             {/* 메인 콘텐츠 영역 */}
-            <div className="flex-1 flex overflow-hidden">
+            <div className="flex-1 flex overflow-hidden min-h-0">
                 {/* 왼쪽 노드 팔레트 */}
                 <div className="w-60 bg-white dark:bg-[#3a2e5a] shadow-sm border-r border-[#d1c4e9] dark:border-[#9575cd] overflow-y-auto">
                     <NodePalette />
                 </div>
 
                 {/* 중앙 캔버스 */}
-                <div className="flex-1 bg-[#f8f6fc] dark:bg-[#2a2139] relative">
+                <div className="flex-1 bg-[#f8f6fc] dark:bg-[#2a2139] relative min-h-0">
                     <WorkflowCanvas 
                         elements={elements} 
                         setElements={setElements}
-                        selectedNode={selectedNode}
-                        setSelectedNode={setSelectedNode}
+                        onCyInit={handleCyInit}
+                        selectedNodeId={selectedNode?.id}
                     />
                 </div>
 
@@ -105,16 +218,7 @@ const WorkflowCanvasPage = () => {
                 <div className="w-72 bg-white dark:bg-[#3a2e5a] shadow-sm border-l border-[#d1c4e9] dark:border-[#9575cd] overflow-y-auto">
                     <PropertyEditor 
                         selectedNode={selectedNode}
-                        onUpdateNode={(nodeId, updatedProps) => {
-                            setElements(currentElements =>
-                                currentElements.map(el => {
-                                    if (el.id === nodeId) {
-                                        return { ...el, ...updatedProps };
-                                    }
-                                    return el;
-                                })
-                            );
-                        }}
+                        onUpdateNode={handleUpdateNode}
                     />
                 </div>
             </div>
