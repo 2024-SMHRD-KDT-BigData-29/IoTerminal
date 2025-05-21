@@ -1,3 +1,5 @@
+require('dotenv').config(); // <--- 이 줄을 추가하세요!
+
 const path = require('path');
 console.log('Current directory:', __dirname);
 console.log('Looking for database.js at:', path.join(__dirname, 'config', 'database.js'));

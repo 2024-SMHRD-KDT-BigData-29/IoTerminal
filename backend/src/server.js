@@ -1,3 +1,5 @@
+require('dotenv').config(); // <--- 이 줄을 추가하세요!
+
 // File: backend/src/server.js
 const express = require('express');
 const cors = require('cors');

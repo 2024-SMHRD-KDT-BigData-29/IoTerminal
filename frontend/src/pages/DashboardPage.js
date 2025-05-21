@@ -1,24 +1,16 @@
 // File: frontend/src/pages/DashboardPage.js
-// (이전 답변 "3.8을 다시 출력해줘"에서 제공된 DashboardPage.js 전체 코드를 사용하되,
-// MainLayout에서 이미 상단 헤더(검색, 알림 등)를 제공하므로, 
-// DashboardPage 자체에서는 페이지 제목("Dashboard Overview")과 그 아래 콘텐츠만 집중합니다.)
-
-// 대표님이 제공해주신 `dashboard-layout.tsx`의 <main> 태그 내부 콘텐츠를 여기에 구현합니다.
-// SummaryCard, SensorStatusItem, WorkflowItem, ApiItem 컴포넌트 정의는
-// 이전 답변("3.8을 다시 출력해줘"에 대한 응답)의 DashboardPage.js 코드에 이미 포함되어 있습니다.
-// 해당 컴포넌트들을 사용하여 UI를 구성합니다.
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom'; // Link 임포트 추가
+import { Link, useNavigate } from 'react-router-dom';
 import { 
     LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import io from 'socket.io-client';
 import { 
-    Activity, Database, Shield, Globe, Thermometer, Droplet, Zap, Wind, AlertTriangle
+    Activity, Database, Shield, Globe, Thermometer, Droplet, Zap, Wind, AlertTriangle, ChevronRight
 } from 'lucide-react';
 import { getDashboardSummary, getSensorStatuses, getRecentWorkflowsForDashboard, getApiStatusesForDashboard } from '../services/dashboardService';
-import { getRecentWorkflows } from '../api/workflow';
+// import { getRecentWorkflows } from '../api/workflow'; // 주석 처리된 원래 상태 유지
 import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
 import format from 'date-fns/format';
 import parse from 'date-fns/parse';
@@ -29,110 +21,188 @@ import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { getCalendarEvents, createCalendarEvent, updateCalendarEvent, deleteCalendarEvent } from '../services/calendarService';
 import { getCurrentUserData } from '../services/authService';
 
-const SOCKET_SERVER_URL = 'http://localhost:3001';
+const SOCKET_SERVER_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:3001';
 const MAX_DATA_POINTS_LINE_CHART = 30;
 
-const locales = {
-    'ko': ko,
+const locales = { 'ko': ko };
+const localizer = dateFnsLocalizer({ format, parse, startOfWeek, getDay, locales });
+
+// --- Reusable Components (실제 예시 정의) ---
+const SummaryCard = ({ title, value, change, up, icon }) => {
+    return (
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300">
+            <div className="flex items-center">
+                {icon && <div className="p-3 bg-purple-100 dark:bg-purple-500/20 rounded-lg mr-4">{icon}</div>}
+                <div>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{title}</p>
+                    <p className="text-2xl font-bold text-gray-800 dark:text-white">{value}</p>
+                    {change && (
+                        <p className={`text-xs font-medium ${up ? 'text-green-500 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+                            {change}
+                        </p>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
 };
 
-const localizer = dateFnsLocalizer({
-    format,
-    parse,
-    startOfWeek,
-    getDay,
-    locales,
-});
+const SensorStatusItem = ({ name, status, value, IconComponent }) => {
+    return (
+        <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-2.5 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 cursor-pointer">
+            <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                    <div className="p-1.5 bg-purple-100 dark:bg-purple-500/20 rounded-md">
+                        {IconComponent && <IconComponent size={18} className="text-purple-600 dark:text-purple-400" />}
+                    </div>
+                    <div>
+                        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-200">{name}</h4>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{value}</p>
+                    </div>
+                </div>
+                <div className={`px-1.5 py-0.5 rounded-full text-xs font-medium ${status === 'active' ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400'}`}>
+                    {status === 'active' ? '정상' : '오류'}
+                </div>
+            </div>
+        </div>
+    );
+};
 
-// --- Reusable Components (SummaryCard, SensorStatusItem, WorkflowItem, ApiItem) ---
-// (이 컴포넌트들의 정의는 이전 답변의 DashboardPage.js 코드와 동일하게 유지합니다. 
-//  여기서는 지면 관계상 생략하고, 이전 답변 코드를 참고하여 여기에 포함시켜주세요.)
-const SummaryCard = ({ title, value, change, up, icon }) => { /* ... */ };
-const SensorStatusItem = ({ name, status, value, IconComponent }) => { /* ... */ };
-const WorkflowItem = ({ name, time, status, statusColor }) => { /* ... */ };
-const ApiItem = ({ name, status, statusColor, calls }) => { /* ... */ };
+const WorkflowItem = ({ name, time, status, statusColor = 'text-gray-500' }) => { // status, statusColor props 추가
+    return (
+        <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200">
+            <div className="flex justify-between items-start">
+                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate mb-1">{name}</h4>
+                {status && <span className={`text-xs ${statusColor}`}>{status}</span>}
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">마지막 수정: {time}</p>
+        </div>
+    );
+};
+
+const ApiItem = ({ name, status, statusColor, calls }) => { // ApiItem 정의 추가
+    return (
+        <div className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg">
+            <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-700 dark:text-gray-200">{name}</span>
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusColor}`}>
+                    {status}
+                </span>
+            </div>
+            {calls && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">호출: {calls}</p>}
+        </div>
+    );
+};
 // --- End Reusable Components ---
 
 function DashboardPage() {
     const [liveSensorData, setLiveSensorData] = useState([]);
-    const [isConnected, setIsConnected] = useState(false); // Socket.IO 연결 상태
+    const [isConnected, setIsConnected] = useState(false);
     const socketRef = useRef(null);
 
     const [summaryData, setSummaryData] = useState({ activeSensors: 0, dataCollected: "0", errorRate: "0%", apiCalls: "0" });
     const [sensorStatuses, setSensorStatuses] = useState([]);
     const [recentWorkflows, setRecentWorkflows] = useState([]);
     const [apiStatuses, setApiStatuses] = useState([]);
-    const [dateRangeFilter, setDateRangeFilter] = useState('today'); // For chart filter
-    const [isLoading, setIsLoading] = useState(true);
+    const [dateRangeFilter, setDateRangeFilter] = useState('today');
+    const [isLoading, setIsLoading] = useState(true); // 워크플로우 등 로딩
     const navigate = useNavigate();
 
     const [events, setEvents] = useState([]);
     const [isLoadingEvents, setIsLoadingEvents] = useState(true);
-    const user = getCurrentUserData();
-    const userId = user?.user_id;  // user_id만 사용
+    const currentUser = getCurrentUserData(); // user -> currentUser
+    const userId = currentUser?.user_id;
+    
 
-    // 캘린더 이벤트 로드
+    // 캘린더 이벤트 로드 (이전 단순 버전)
     useEffect(() => {
         const loadCalendarEvents = async () => {
             try {
                 setIsLoadingEvents(true);
-                const response = await getCalendarEvents();
-                if (response.success) {
-                    const formattedEvents = response.events.map((event, idx) => ({
-                        ...event,
-                        id: event.id || `event-${event.start}-${event.end}-${idx}`,
-                        start: new Date(event.start),
-                        end: new Date(event.end)
-                    }));
+                // getCalendarEvents()는 {success: true, events: [...]} 형태를 반환한다고 가정
+                const responseData = await getCalendarEvents();
+                console.log("[DashboardPage] Raw events data from backend (reverted version):", JSON.stringify(responseData, null, 2));
+
+                if (responseData && responseData.success && Array.isArray(responseData.events)) {
+                    const formattedEvents = responseData.events.map((event, idx) => {
+                        const startDate = event.start ? new Date(event.start) : null;
+                        const endDate = event.end ? new Date(event.end) : null;
+
+                        if (!startDate || isNaN(startDate.getTime()) || !endDate || isNaN(endDate.getTime())) {
+                            console.error("!!! [DashboardPage] Invalid Date object created for event (reverted version):", event);
+                            return null; 
+                        }
+                        return {
+                            ...event,
+                            id: event.id || `event-idx-${idx}`,
+                            start: startDate,
+                            end: endDate,
+                            allDay: event.allDay || false,
+                            desc: event.description || event.desc || '',
+                        };
+                    }).filter(event => event !== null);
                     setEvents(formattedEvents);
+                } else {
+                    console.warn('[DashboardPage] Calendar data not loaded or format mismatch (reverted version):', responseData);
+                    setEvents([]);
                 }
             } catch (error) {
-                console.error('일정 로드 실패:', error);
+                console.error('[DashboardPage] Exception while loading calendar events (reverted version):', error);
+                if (error.authError) {
+                    alert('일정 로드 권한이 없습니다. 다시 로그인해주세요.');
+                    if(navigate) navigate('/login');
+                }
+                setEvents([]);
             } finally {
                 setIsLoadingEvents(false);
             }
         };
 
-        loadCalendarEvents();
-    }, []);
+        if (userId) { 
+            loadCalendarEvents();
+        } else {
+            setIsLoadingEvents(false); 
+            setEvents([]); 
+            console.log("[DashboardPage] No user_id found, skipping calendar event load (reverted version).");
+        }
+    }, [userId, navigate]);
 
-    // 이벤트가 변경될 때마다 로컬 스토리지에 저장
-    useEffect(() => {
-        localStorage.setItem('calendar_events', JSON.stringify(events));
-    }, [events]);
-
-    // 이벤트 추가 모달 상태
-    const [showEventModal, setShowEventModal] = useState(false);
-    const [selectedEvent, setSelectedEvent] = useState(null);
-    const [newEvent, setNewEvent] = useState({
-        title: '',
-        start: null,
-        end: null,
-        desc: ''
-    });
-
-    // Fetch initial dashboard data from mock backend
+    // 기타 데이터 로드 (Summary, SensorStatus, Workflow, ApiStatus)
     useEffect(() => {
         const fetchAllDashboardData = async () => {
+            setIsLoading(true); // 전체 데이터 로딩 시작
             try {
-                const [summary, statuses, workflows, apis] = await Promise.all([
+                const [summary, statuses, workflowsData, apis] = await Promise.all([
                     getDashboardSummary(),
                     getSensorStatuses(),
-                    getRecentWorkflowsForDashboard(),
+                    getRecentWorkflowsForDashboard(), // 워크플로우 서비스 호출
                     getApiStatusesForDashboard()
                 ]);
                 setSummaryData(summary);
                 setSensorStatuses(statuses);
-                setRecentWorkflows(workflows);
+                // 워크플로우 데이터 처리
+                if (workflowsData && workflowsData.success && Array.isArray(workflowsData.workflows)) {
+                    setRecentWorkflows(workflowsData.workflows);
+                } else {
+                    console.error('[DashboardPage] Failed to load recent workflows (reverted version):', workflowsData);
+                    setRecentWorkflows([]);
+                }
                 setApiStatuses(apis);
             } catch (error) {
-                console.error("Error fetching dashboard data:", error);
+                console.error("Error fetching dashboard data (reverted version):", error);
+                // 개별적으로 실패할 수 있으므로, 각 state를 초기화할지 여부 결정
+                setSummaryData({ activeSensors: 0, dataCollected: "0", errorRate: "0%", apiCalls: "0" });
+                setSensorStatuses([]);
+                setRecentWorkflows([]);
+                setApiStatuses([]);
+            } finally {
+                setIsLoading(false); // 전체 데이터 로딩 완료
             }
         };
         fetchAllDashboardData();
     }, []);
-
-    // Socket.IO connection for live data
+    
+    // Socket.IO (이전과 동일)
     useEffect(() => {
         socketRef.current = io(SOCKET_SERVER_URL, { transports: ['websocket'] });
         socketRef.current.on('connect', () => setIsConnected(true));
@@ -141,7 +211,7 @@ function DashboardPage() {
             setLiveSensorData(prevData => {
                 const enrichedData = { 
                     ...newData, 
-                    time: new Date(newData.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) 
+                    time: new Date(newData.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) 
                 };
                 const updatedData = [...prevData, enrichedData];
                 return updatedData.slice(-MAX_DATA_POINTS_LINE_CHART);
@@ -150,24 +220,8 @@ function DashboardPage() {
         return () => { if (socketRef.current) socketRef.current.disconnect(); };
     }, []);
 
-    useEffect(() => {
-        const fetchRecentWorkflows = async () => {
-            try {
-                const response = await getRecentWorkflows();
-                if (response.success) {
-                    setRecentWorkflows(response.workflows);
-                }
-            } catch (error) {
-                console.error('최근 워크플로우 조회 실패:', error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        fetchRecentWorkflows();
-    }, []);
-
-    const getIconComponentForSensor = (sensorName = "") => { // Returns Component Type
+    // getIconComponentForSensor (이전과 동일)
+    const getIconComponentForSensor = (sensorName = "") => {
         const lowerSensorName = sensorName.toLowerCase();
         if (lowerSensorName.includes("온도") || lowerSensorName.includes("temperature")) return Thermometer;
         if (lowerSensorName.includes("습도") || lowerSensorName.includes("humidity")) return Droplet;
@@ -177,123 +231,104 @@ function DashboardPage() {
         return Activity;
     };
 
-    // 이벤트 저장
+    // Calendar Event Handlers (이전과 동일, 날짜 파싱 부분은 loadCalendarEvents와 handleSaveEvent에서 주의)
+    const [showEventModal, setShowEventModal] = useState(false);
+    const [selectedEvent, setSelectedEvent] = useState(null);
+    const [newEvent, setNewEvent] = useState({ title: '', start: null, end: null, desc: '' });
+    // dateRangeFilter는 현재 JSX에서 사용되지 않음
+
     const handleSaveEvent = async () => {
-        if (!userId) {
-            alert('로그인이 필요합니다.');
-            navigate('/login');
-            return;
-        }
-
+        if (!userId) { if (navigate) navigate('/login'); return; }
         if (!newEvent.title || !newEvent.start || !newEvent.end) {
-            alert('제목, 시작 시간, 종료 시간은 필수 입력 항목입니다.');
-            return;
+            alert('제목, 시작 시간, 종료 시간은 필수입니다.'); return;
         }
-
         try {
-            const eventData = {
-                ...newEvent,
-                user_id: userId,
-                start: newEvent.start.toISOString(),
-                end: newEvent.end.toISOString()
+            const eventDataPayload = {
+                title: newEvent.title,
+                start: newEvent.start.toISOString(), 
+                end: newEvent.end.toISOString(),     
+                description: newEvent.desc, // 백엔드 컨트롤러에서 desc 대신 description을 받을 수 있음
             };
-
             let response;
-            if (selectedEvent) {
-                // 이벤트 수정
-                response = await updateCalendarEvent(selectedEvent.id, eventData);
+            if (selectedEvent && selectedEvent.id) {
+                response = await updateCalendarEvent(selectedEvent.id, eventDataPayload);
             } else {
-                // 새 이벤트 추가
-                response = await createCalendarEvent(eventData);
+                response = await createCalendarEvent(eventDataPayload);
             }
+            if (response && response.success && response.event) {
+                const processedEvent = {
+                    ...response.event,
+                    start: response.event.start ? new Date(response.event.start) : null, // 단순 new Date() 사용
+                    end: response.event.end ? new Date(response.event.end) : null      // 단순 new Date() 사용
+                };
+                 // 상태 업데이트 전 유효성 검사 추가
+                if (processedEvent.start && isNaN(processedEvent.start.getTime())) processedEvent.start = null;
+                if (processedEvent.end && isNaN(processedEvent.end.getTime())) processedEvent.end = null;
 
-            if (response.success) {
-                if (selectedEvent) {
-                    setEvents(events.map(event => 
-                        event.id === selectedEvent.id ? { ...eventData, id: event.id } : event
-                    ));
+                if (selectedEvent && selectedEvent.id) {
+                    setEvents(events.map(ev => ev.id === selectedEvent.id ? processedEvent : ev));
                 } else {
-                    setEvents([...events, { ...eventData, id: response.event.id }]);
+                    setEvents([...events, processedEvent]);
                 }
                 setShowEventModal(false);
                 setSelectedEvent(null);
                 setNewEvent({ title: '', start: null, end: null, desc: '' });
+            } else {
+                alert(response?.error || '일정 저장 실패');    
             }
         } catch (error) {
-            console.error('일정 저장 실패:', error);
-            if (error.authError) {
-                alert('로그인이 필요합니다.');
-                navigate('/login');
-            } else {
-                alert(error.message || '일정 저장에 실패했습니다.');
-            }
+            console.error('[DashboardPage] Error saving event (reverted version):', error);
+            if (error.authError) { if (navigate) navigate('/login'); } 
+            else { alert(error.message || '일정 저장 중 오류'); }
         }
     };
 
-    // 이벤트 삭제
-    const handleDeleteEvent = async (eventId) => {
-        if (!userId) {
-            alert('로그인이 필요합니다.');
-            navigate('/login');
-            return;
-        }
-
-        if (!window.confirm('정말로 이 일정을 삭제하시겠습니까?')) {
-            return;
-        }
-
+    const handleDeleteEvent = async (eventIdToDelete) => {
+        // (이전과 동일)
+        if (!userId) { if (navigate) navigate('/login'); return; }
+        if (!eventIdToDelete || !window.confirm('삭제하시겠습니까?')) return;
         try {
-            const response = await deleteCalendarEvent(eventId);
-            if (response.success) {
-                setEvents(events.filter(event => event.id !== eventId));
-                setShowEventModal(false);
-                setSelectedEvent(null);
+            const response = await deleteCalendarEvent(eventIdToDelete);
+            if (response && response.success) {
+                setEvents(events.filter(event => event.id !== eventIdToDelete));
+                setShowEventModal(false); 
+                setSelectedEvent(null);  
+            } else {
+                 alert(response?.error || '일정 삭제 실패');    
             }
         } catch (error) {
-            console.error('일정 삭제 실패:', error);
-            if (error.authError) {
-                alert('로그인이 필요합니다.');
-                navigate('/login');
-            } else {
-                alert(error.message || '일정 삭제에 실패했습니다.');
-            }
+            console.error('[DashboardPage] Error deleting event (reverted version):', error);
+            if (error.authError) { if (navigate) navigate('/login'); } 
+            else { alert(error.message || '일정 삭제 중 오류'); }
         }
     };
 
-    // 이벤트 선택 핸들러
     const handleSelectEvent = (event) => {
         setSelectedEvent(event);
         setNewEvent({
             title: event.title,
-            start: event.start,
-            end: event.end,
-            desc: event.desc
+            start: event.start, // 이미 Date 객체여야 함
+            end: event.end,     // 이미 Date 객체여야 함
+            desc: event.desc || event.description || ''
         });
         setShowEventModal(true);
     };
 
-    // 새 이벤트 생성 핸들러
-    const handleSelect = ({ start, end }) => {
-        setSelectedEvent(null);
-        setNewEvent({
-            title: '',
-            start,
-            end,
-            desc: ''
-        });
+    const handleSelectSlot = ({ start, end }) => { 
+        setSelectedEvent(null); 
+        setNewEvent({ title: '', start, end, desc: '' });
         setShowEventModal(true);
     };
 
+    // --- JSX 렌더링 부분 ---
     return (
-        <div className="p-6 space-y-6">
-            {/* Connection Status */}
+        <div className="p-4 md:p-6 space-y-6 bg-gray-50 dark:bg-gray-900 min-h-screen">
             <div className="text-xs text-right text-gray-500 dark:text-gray-400"> 
                 Socket Status: {isConnected ? 
                     <span className="text-green-500 font-semibold">Connected</span> : 
                     <span className="text-red-500 font-semibold">Disconnected</span>}
             </div>
 
-            {/* Summary Cards Section */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <SummaryCard title="활성 센서" value={summaryData.activeSensors} change="+2" up={true} icon={<Activity size={20} className="text-blue-500" />} />
                 <SummaryCard title="수집 데이터 (오늘)" value={summaryData.dataCollected} change="+12%" up={true} icon={<Database size={20} className="text-green-500" />} />
@@ -301,37 +336,20 @@ function DashboardPage() {
                 <SummaryCard title="API 호출 (오늘)" value={summaryData.apiCalls} change="+5%" up={true} icon={<Globe size={20} className="text-purple-500" />} />
             </div>
             
-            {/* Main Content Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                {/* 실시간 데이터 스트림 */}
-                <div className="bg-white dark:bg-[#3a2e5a] rounded-xl shadow-lg p-4 lg:col-span-2">
-                    <div className="flex flex-wrap justify-between items-center mb-4">
-                        <h3 className="text-lg font-semibold text-gray-700 dark:text-[#b39ddb]">실시간 데이터 스트림</h3>
-                        <select 
-                            value={dateRangeFilter} 
-                            onChange={(e) => setDateRangeFilter(e.target.value)}
-                            className="text-sm px-3 py-1.5 rounded-lg border border-gray-200 dark:border-[#4a3f6d] bg-white dark:bg-[#2a2139] text-gray-700 dark:text-[#b39ddb] focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        >
-                            <option value="today">오늘</option>
-                            <option value="this_week">이번 주</option>
-                            <option value="this_month">이번 달</option>
-                        </select>
-                    </div>
-                    <div className="h-[400px]">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 lg:col-span-2">
+                    <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-4">실시간 데이터 스트림</h3>
+                    <div className="h-[350px] md:h-[400px]">
                         {liveSensorData.length > 0 ? (
                             <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={liveSensorData}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-                                    <XAxis dataKey="time" tick={{fontSize: 12, fill: '#666'}} />
-                                    <YAxis yAxisId="left" orientation="left" stroke="#8884d8" tick={{fontSize: 12, fill: '#666'}} />
-                                    <YAxis yAxisId="right" orientation="right" stroke="#82ca9d" tick={{fontSize: 12, fill: '#666'}} />
+                                 <LineChart data={liveSensorData}>
+                                    <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.3} className="dark:stroke-gray-600 stroke-gray-300" />
+                                    <XAxis dataKey="time" tick={{fontSize: 11, fill: '#6b7280'}} className="dark:fill-gray-400" />
+                                    <YAxis yAxisId="left" orientation="left" stroke="#8884d8" tick={{fontSize: 11, fill: '#6b7280'}} className="dark:fill-gray-400" />
+                                    <YAxis yAxisId="right" orientation="right" stroke="#82ca9d" tick={{fontSize: 11, fill: '#6b7280'}} className="dark:fill-gray-400" />
                                     <Tooltip 
-                                        wrapperStyle={{
-                                            fontSize: '12px',
-                                            backgroundColor: 'rgba(255,255,255,0.9)',
-                                            borderRadius: '8px',
-                                            boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
-                                        }}
+                                        contentStyle={{ backgroundColor: 'rgba(255,255,255,0.9)', fontSize: '12px', borderRadius: '8px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}
+                                        itemStyle={{ color: '#333' }}
                                     />
                                     <Legend wrapperStyle={{fontSize: '12px', paddingTop: '10px'}} />
                                     <Line yAxisId="left" type="monotone" dataKey="temperature" stroke="#8884d8" strokeWidth={2} activeDot={{ r: 5 }} name="온도 (°C)" dot={false} />
@@ -339,80 +357,45 @@ function DashboardPage() {
                                     {liveSensorData[0]?.pressure !== undefined && 
                                         <Line yAxisId="left" type="monotone" dataKey="pressure" stroke="#ffc658" strokeWidth={2} activeDot={{ r: 5 }} name="압력 (hPa)" dot={false} />
                                     }
-                                    {liveSensorData[0]?.lightLevel !== undefined && 
-                                        <Line yAxisId="right" type="monotone" dataKey="lightLevel" stroke="#ff7f0e" strokeWidth={2} activeDot={{ r: 5 }} name="조도 (lux)" dot={false} />
-                                    }
                                 </LineChart>
                             </ResponsiveContainer>
                         ) : (
-                            <div className="h-full w-full bg-gray-50 dark:bg-[#2a2139] rounded-lg flex items-center justify-center">
+                            <div className="h-full w-full bg-gray-100 dark:bg-gray-700/30 rounded-lg flex items-center justify-center">
                                 <span className="text-gray-400 dark:text-gray-500 italic">실시간 센서 데이터 수신 대기 중...</span>
                             </div>
                         )}
                     </div>
                 </div>
                 
-                {/* 디바이스 상태 및 일정 관리 */}
-                <div className="space-y-4">
-                    {/* 디바이스 상태 */}
-                    <div className="bg-white dark:bg-[#3a2e5a] rounded-xl shadow-lg p-4">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-lg font-semibold text-gray-700 dark:text-[#b39ddb]">디바이스 상태</h3>
-                            <Link 
-                                to="/iot/devices" 
-                                className="text-sm font-medium text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300"
-                            >
-                                전체 보기
-                            </Link>
+                <div className="space-y-6">
+                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4">
+                        <div className="flex justify-between items-center mb-3">
+                            <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-200">디바이스 상태</h3>
+                            <Link to="/iot-devices" className="text-xs font-medium text-purple-600 dark:text-purple-400 hover:underline">전체 보기</Link>
                         </div>
-                        <div className="grid grid-cols-1 gap-2 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
+                        <div className="space-y-2 max-h-[150px] overflow-y-auto custom-scrollbar pr-1">
                             {sensorStatuses.length > 0 ? sensorStatuses.map((sensor, idx) => (
-                                <div 
-                                    key={sensor.id || `sensor-${idx}`}
-                                    className="bg-gray-50 dark:bg-[#2a2139] rounded-lg p-3 hover:bg-gray-100 dark:hover:bg-[#3a2e5a] transition-colors duration-200 cursor-pointer"
-                                    onClick={() => navigate(`/iot/devices/${sensor.id}`)}
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center space-x-3">
-                                            <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-                                                {React.createElement(getIconComponentForSensor(sensor.name), {
-                                                    size: 20,
-                                                    className: "text-purple-600 dark:text-purple-400"
-                                                })}
-                                            </div>
-                                            <div>
-                                                <h4 className="font-medium text-gray-700 dark:text-[#b39ddb]">
-                                                    {sensor.name}
-                                                </h4>
-                                                <p className="text-sm text-gray-500 dark:text-gray-400">
-                                                    {sensor.value}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                            sensor.status === 'active' 
-                                                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                                : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                                        }`}>
-                                            {sensor.status === 'active' ? '정상' : '오류'}
-                                        </div>
-                                    </div>
-                                </div>
+                                <SensorStatusItem 
+                                  key={sensor.id || `sensor-${idx}`}
+                                  name={sensor.name}
+                                  status={sensor.status}
+                                  value={sensor.value}
+                                  IconComponent={getIconComponentForSensor(sensor.name)}
+                                />
                             )) : (
-                                <div className="text-sm text-gray-500 dark:text-gray-400 py-4 text-center bg-gray-50 dark:bg-[#2a2139] rounded-lg">
+                                <div className="text-xs text-gray-500 dark:text-gray-400 py-3 text-center bg-gray-50 dark:bg-gray-700/30 rounded-lg">
                                     등록된 디바이스가 없습니다
                                 </div>
                             )}
                         </div>
                     </div>
 
-                    {/* 일정 관리 */}
-                    <div className="bg-white dark:bg-[#3a2e5a] rounded-xl shadow-lg p-4">
-                        <h3 className="text-lg font-semibold text-gray-700 dark:text-[#b39ddb] mb-4">일정 관리</h3>
-                        <div className="h-[300px]">
+                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4">
+                        <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-3">일정 관리</h3>
+                        <div className="h-[280px] md:h-[300px] text-sm">
                             {isLoadingEvents ? (
                                 <div className="h-full flex items-center justify-center">
-                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400"></div>
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
                                 </div>
                             ) : (
                                 <Calendar
@@ -421,24 +404,17 @@ function DashboardPage() {
                                     startAccessor="start"
                                     endAccessor="end"
                                     style={{ height: '100%' }}
-                                    onSelectSlot={handleSelect}
+                                    onSelectSlot={handleSelectSlot}
                                     onSelectEvent={handleSelectEvent}
                                     selectable
                                     views={['month', 'week', 'day']}
                                     messages={{
-                                        next: "다음",
-                                        previous: "이전",
-                                        today: "오늘",
-                                        month: "월",
-                                        week: "주",
-                                        day: "일",
-                                        agenda: "일정",
-                                        date: "날짜",
-                                        time: "시간",
-                                        event: "일정",
-                                        noEventsInRange: "일정이 없습니다.",
+                                        next: "다음", previous: "이전", today: "오늘",
+                                        month: "월", week: "주", day: "일", agenda: "일정 목록",
+                                        date: "날짜", time: "시간", event: "일정 내용",
+                                        noEventsInRange: "해당 범위에 일정이 없습니다.",
                                     }}
-                                    className="dark:bg-[#2a2139] dark:text-[#b39ddb]"
+                                    className="rbc-calendar dark:text-gray-300"
                                 />
                             )}
                         </div>
@@ -446,39 +422,28 @@ function DashboardPage() {
                 </div>
             </div>
             
-            {/* 워크플로우 섹션 */}
-            <div className="bg-white dark:bg-[#3a2e5a] rounded-xl shadow-lg p-4">
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-semibold text-gray-700 dark:text-[#b39ddb]">최근 워크플로우</h3>
-                    <Link 
-                        to="/workflow/new" 
-                        className="text-sm font-medium text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300"
-                    >
-                        새로 만들기
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4">
+                <div className="flex justify-between items-center mb-3">
+                    <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-200">최근 워크플로우</h3>
+                    <Link to="/workflow" className="text-xs font-medium text-purple-600 dark:text-purple-400 hover:underline">
+                        전체 보기 및 새로 만들기
                     </Link>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {isLoading ? (
-                        <div className="col-span-full flex justify-center py-8">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400"></div>
+                    {isLoading ? ( // 이 isLoading은 워크플로우 섹션에 대한 로딩 상태
+                         <div className="col-span-full flex justify-center py-6">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
                         </div>
                     ) : recentWorkflows.length > 0 ? (
-                        recentWorkflows.map((workflow, idx) => (
-                            <div 
-                                key={workflow.workflow_id || `workflow-${idx}`}
-                                className="bg-[#f8f6fc] dark:bg-[#2a2139] rounded-lg p-4 cursor-pointer hover:bg-[#ede7f6] dark:hover:bg-[#3a2e5a] transition-colors duration-200"
-                                onClick={() => navigate(`/workflow/edit/${workflow.workflow_id}`)}
-                            >
-                                <h4 className="font-medium text-gray-700 dark:text-[#b39ddb] mb-2">
-                                    {workflow.name}
-                                </h4>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">
-                                    마지막 수정: {new Date(workflow.updated_at).toLocaleDateString()}
-                                </p>
-                            </div>
+                        recentWorkflows.slice(0, 3).map((workflow, idx) => (
+                            <WorkflowItem
+                                key={workflow.id || workflow.workflow_id || `workflow-${idx}`}
+                                name={workflow.name}
+                                time={workflow.updated_at ? new Date(workflow.updated_at).toLocaleDateString() : 'N/A'}
+                            />
                         ))
                     ) : (
-                        <div className="col-span-full text-center py-8 text-gray-500 dark:text-gray-400">
+                        <div className="col-span-full text-center py-6 text-sm text-gray-500 dark:text-gray-400">
                             최근 워크플로우가 없습니다.
                         </div>
                     )}
@@ -487,78 +452,58 @@ function DashboardPage() {
 
             {/* 이벤트 모달 */}
             {showEventModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white dark:bg-[#3a2e5a] rounded-xl p-6 w-full max-w-md">
-                        <h3 className="text-lg font-semibold text-gray-700 dark:text-[#b39ddb] mb-4">
-                            {selectedEvent ? '일정 수정' : '새 일정'}
+                <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-5 md:p-6 w-full max-w-md">
+                        <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-5">
+                            {selectedEvent ? '일정 수정' : '새 일정 추가'}
                         </h3>
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-[#b39ddb] mb-1">
-                                    제목
-                                </label>
-                                <input
-                                    type="text"
-                                    value={newEvent.title}
+                                <label htmlFor="eventTitle" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">제목</label>
+                                <input id="eventTitle" type="text" value={newEvent.title}
                                     onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
-                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-[#4a3f6d] bg-white dark:bg-[#2a2139] text-gray-700 dark:text-[#b39ddb]"
+                                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200 focus:ring-purple-500 focus:border-purple-500"
                                 />
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-[#b39ddb] mb-1">
-                                    시작 시간
-                                </label>
-                                <input
-                                    type="datetime-local"
-                                    value={newEvent.start ? newEvent.start.toISOString().slice(0, 16) : ''}
-                                    onChange={(e) => setNewEvent({ ...newEvent, start: new Date(e.target.value) })}
-                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-[#4a3f6d] bg-white dark:bg-[#2a2139] text-gray-700 dark:text-[#b39ddb]"
-                                />
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label htmlFor="eventStart" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">시작 시간</label>
+                                    <input id="eventStart" type="datetime-local" 
+                                        value={newEvent.start ? format(newEvent.start, "yyyy-MM-dd'T'HH:mm") : ''}
+                                        onChange={(e) => setNewEvent({ ...newEvent, start: e.target.value ? new Date(e.target.value) : null })}
+                                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200 focus:ring-purple-500 focus:border-purple-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label htmlFor="eventEnd" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">종료 시간</label>
+                                    <input id="eventEnd" type="datetime-local" 
+                                        value={newEvent.end ? format(newEvent.end, "yyyy-MM-dd'T'HH:mm") : ''}
+                                        onChange={(e) => setNewEvent({ ...newEvent, end: e.target.value ? new Date(e.target.value) : null })}
+                                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200 focus:ring-purple-500 focus:border-purple-500"
+                                    />
+                                </div>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-[#b39ddb] mb-1">
-                                    종료 시간
-                                </label>
-                                <input
-                                    type="datetime-local"
-                                    value={newEvent.end ? newEvent.end.toISOString().slice(0, 16) : ''}
-                                    onChange={(e) => setNewEvent({ ...newEvent, end: new Date(e.target.value) })}
-                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-[#4a3f6d] bg-white dark:bg-[#2a2139] text-gray-700 dark:text-[#b39ddb]"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-[#b39ddb] mb-1">
-                                    설명
-                                </label>
-                                <textarea
-                                    value={newEvent.desc}
+                                <label htmlFor="eventDesc" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">설명</label>
+                                <textarea id="eventDesc" value={newEvent.desc}
                                     onChange={(e) => setNewEvent({ ...newEvent, desc: e.target.value })}
-                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-[#4a3f6d] bg-white dark:bg-[#2a2139] text-gray-700 dark:text-[#b39ddb]"
+                                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200 focus:ring-purple-500 focus:border-purple-500"
                                     rows="3"
                                 />
                             </div>
                         </div>
-                        <div className="flex justify-end space-x-2 mt-6">
+                        <div className="flex items-center justify-end space-x-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
                             {selectedEvent && (
-                                <button
-                                    onClick={() => handleDeleteEvent(selectedEvent.id)}
-                                    className="px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg"
-                                >
-                                    삭제
-                                </button>
+                                <button onClick={() => handleDeleteEvent(selectedEvent.id)}
+                                    className="px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-700/30 rounded-lg transition-colors"
+                                >삭제</button>
                             )}
-                            <button
-                                onClick={() => setShowEventModal(false)}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-[#b39ddb] hover:bg-gray-100 dark:hover:bg-[#4a3f6d] rounded-lg"
-                            >
-                                취소
-                            </button>
-                            <button
-                                onClick={handleSaveEvent}
-                                className="px-4 py-2 text-sm font-medium text-white bg-purple-600 dark:bg-purple-500 hover:bg-purple-700 dark:hover:bg-purple-600 rounded-lg"
-                            >
-                                저장
-                            </button>
+                            <button onClick={() => { setShowEventModal(false); setSelectedEvent(null); setNewEvent({ title: '', start: null, end: null, desc: '' });}}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg transition-colors"
+                            >취소</button>
+                            <button onClick={handleSaveEvent}
+                                className="px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 dark:bg-purple-500 dark:hover:bg-purple-600 rounded-lg transition-colors"
+                            >저장</button>
                         </div>
                     </div>
                 </div>

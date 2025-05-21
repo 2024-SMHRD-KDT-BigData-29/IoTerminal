@@ -11,10 +11,18 @@ const api = axios.create({
 // 요청 인터셉터 추가
 api.interceptors.request.use(
     (config) => {
-        const token = getCurrentUserToken();
+        const token = getCurrentUserToken(); // authService에서 이 함수를 호출
+
+        // 추가된 로그들
+        console.log('[AxiosInterceptor] Token from getCurrentUserToken():', token); 
+
         if (token) {
             config.headers['Authorization'] = `Bearer ${token}`;
+            console.log('[AxiosInterceptor] Authorization header SET TO:', config.headers['Authorization']);
+        } else {
+            console.log('[AxiosInterceptor] Token is falsy (null, undefined, empty string). Authorization header NOT SET.');
         }
+        // console.log('[AxiosInterceptor] Final outgoing config.headers:', config.headers); // 필요시 전체 헤더 확인
         return config;
     },
     (error) => {
