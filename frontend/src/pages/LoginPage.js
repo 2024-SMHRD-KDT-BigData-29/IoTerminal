@@ -5,7 +5,7 @@ import { Eye, EyeOff } from 'lucide-react';
 import { login } from '../services/authService';
 
 const LoginPage = () => {
-    const [email, setEmail] = useState('');
+    const [userId, setUserId] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
@@ -14,13 +14,10 @@ const LoginPage = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const result = await login(email, password);
-            // 사용자 정보 localStorage에 저장
-            localStorage.setItem('user', JSON.stringify(result.user));
-            localStorage.setItem('token', result.token);
+            const result = await login(userId, password);
             navigate('/dashboard');
         } catch (err) {
-            setError('이메일 또는 비밀번호가 올바르지 않습니다.');
+            setError('아이디 또는 비밀번호가 올바르지 않습니다.');
         }
     };
 
@@ -48,18 +45,18 @@ const LoginPage = () => {
                     
                     <div className="space-y-4">
                         <div>
-                            <label htmlFor="email" className="block text-sm font-medium text-[#3a2e5a] dark:text-[#b39ddb]">
-                                이메일
+                            <label htmlFor="userId" className="block text-sm font-medium text-[#3a2e5a] dark:text-[#b39ddb]">
+                                아이디
                             </label>
                             <input
-                                id="email"
-                                name="email"
-                                type="email"
+                                id="userId"
+                                name="userId"
+                                type="text"
                                 required
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
+                                value={userId}
+                                onChange={(e) => setUserId(e.target.value)}
                                 className="mt-1 block w-full px-4 py-3 rounded-xl border border-[#d1c4e9] dark:border-[#9575cd] bg-white dark:bg-[#2a2139] text-[#3a2e5a] dark:text-[#b39ddb] placeholder-[#9575cd] dark:placeholder-[#b39ddb] focus:ring-2 focus:ring-[#7e57c2] dark:focus:ring-[#9575cd] focus:border-transparent transition-colors duration-200"
-                                placeholder="이메일을 입력하세요"
+                                placeholder="아이디를 입력하세요"
                             />
                         </div>
 

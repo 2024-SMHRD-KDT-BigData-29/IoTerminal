@@ -54,33 +54,75 @@ exports.register = async (req, res) => {
     }
 };
 
-exports.login = (req, res) => {
-    const { username, password } = req.body;
-    if (!username || !password) {
-        return res.status(400).json({ message: 'Username and password are required.' });
+exports.login = async (req, res) => {
+    const { userId, password } = req.body;
+    
+    console.log('로그인 요청:', { userId });
+    
+    if (!userId || !password) {
+        return res.status(400).json({ 
+            success: false,
+            message: '아이디와 비밀번호를 모두 입력해주세요.' 
+        });
     }
-    // For mockup, a very simple check. In real app, use bcrypt.compare with hashed passwords.
-    const user = users.find(u => u.username === username && u.password === password); // Direct password check for mock
 
-    if (!user) {
-        // Try finding by username only to give a slightly more specific mock error
-        if (!users.find(u => u.username === username)) {
-             return res.status(401).json({ message: 'Mock login failed: User not found.' });
+    try {
+        // DB에서 사용자 조회
+        const [users] = await pool.execute(
+            'SELECT * FROM users WHERE user_id = ?',
+            [userId]
+        );
+
+        console.log('DB 조회 결과:', users);
+
+        if (users.length === 0) {
+            return res.status(401).json({
+                success: false,
+                message: '아이디 또는 비밀번호가 올바르지 않습니다.'
+            });
         }
-        return res.status(401).json({ message: 'Mock login failed: Incorrect password.' });
-    }
 
-    const token = jwt.sign(
-        { userId: user.id, username: user.username, role: user.role },
-        JWT_SECRET,
-        { expiresIn: JWT_EXPIRES_IN }
-    );
-    console.log('Mock Login: User logged in', user.username);
-    res.json({ 
-        message: 'Mock login successful.', 
-        token, 
-        user: { id: user.id, username: user.username, role: user.role }
-    });
+        const user = users[0];
+        
+        // 비밀번호 검증
+        const isValidPassword = await bcrypt.compare(password, user.password);
+        console.log('비밀번호 검증 결과:', isValidPassword);
+        
+        if (!isValidPassword) {
+            return res.status(401).json({
+                success: false,
+                message: '아이디 또는 비밀번호가 올바르지 않습니다.'
+            });
+        }
+
+        // JWT 토큰 생성
+        const token = jwt.sign(
+            { 
+                userId: user.user_id,
+                name: user.name,
+                role: user.role || 'user'
+            },
+            JWT_SECRET,
+            { expiresIn: JWT_EXPIRES_IN }
+        );
+
+        // 응답 데이터에서 비밀번호 제외
+        const { password: _, ...userWithoutPassword } = user;
+
+        res.json({
+            success: true,
+            message: '로그인 성공',
+            token,
+            user: userWithoutPassword
+        });
+
+    } catch (error) {
+        console.error('로그인 오류:', error);
+        res.status(500).json({
+            success: false,
+            message: '로그인 처리 중 오류가 발생했습니다.'
+        });
+    }
 };
 
 // // 실제 API 호출 버전

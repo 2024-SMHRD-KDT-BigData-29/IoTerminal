@@ -6,6 +6,7 @@ import NodePalette from '../components/workflow/NodePalette';
 import PropertyEditor from '../components/workflow/PropertyEditor';
 import { saveWorkflow, getWorkflowById } from '../api/workflow';
 import { getCurrentUserData } from '../services/authService';
+import { API_URL } from '../config';
 
 const WorkflowCanvasPage = () => {
     const [elements, setElements] = useState([]);
@@ -26,15 +27,23 @@ const WorkflowCanvasPage = () => {
                     if (response.success) {
                         setWorkflowName(response.workflow.name);
                         setElements([...response.workflow.nodes, ...response.workflow.edges]);
+                    } else {
+                        throw new Error(response.message || '워크플로우를 불러오는데 실패했습니다.');
                     }
                 } catch (error) {
                     console.error('워크플로우 불러오기 실패:', error);
-                    alert('워크플로우를 불러오는데 실패했습니다.');
+                    if (error.message.includes('인증') || error.message.includes('토큰')) {
+                        alert('로그인이 필요합니다. 다시 로그인해주세요.');
+                        navigate('/login');
+                    } else {
+                        alert('워크플로우를 불러오는데 실패했습니다.');
+                        navigate('/workflow');
+                    }
                 }
             };
             fetchWorkflow();
         }
-    }, [workflowId]);
+    }, [workflowId, navigate]);
 
     const handleSaveWorkflow = async () => {
         if (!workflowName.trim()) {
@@ -43,7 +52,7 @@ const WorkflowCanvasPage = () => {
         }
 
         const user = getCurrentUserData();
-        const userId = user?.userId || user?.id;
+        const userId = user?.user_id || user?.userId || user?.id;
         if (!userId) {
             alert('로그인 정보가 올바르지 않습니다. 다시 로그인 해주세요.');
             setIsSaving(false);
@@ -77,16 +86,34 @@ const WorkflowCanvasPage = () => {
                 isPublic: false
             };
 
-            console.log('저장될 워크플로우 데이터:', workflowData); // 디버깅용
+            console.log('저장될 워크플로우 데이터:', workflowData);
 
-            const response = await saveWorkflow(workflowData);
-            if (response.success) {
+            let response;
+            if (workflowId) {
+                // 기존 워크플로우 업데이트
+                response = await fetch(`${API_URL}/workflow/${workflowId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${sessionStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify(workflowData)
+                });
+            } else {
+                // 새 워크플로우 생성
+                response = await saveWorkflow(workflowData);
+            }
+
+            const data = await response.json();
+            if (data.success) {
                 alert('워크플로우가 저장되었습니다.');
-                navigate('/workflow'); // 워크플로우 목록으로 이동
+                navigate('/workflow');
+            } else {
+                throw new Error(data.message || '워크플로우 저장에 실패했습니다.');
             }
         } catch (error) {
             console.error('워크플로우 저장 실패:', error);
-            alert('워크플로우 저장에 실패했습니다.');
+            alert(error.message || '워크플로우 저장에 실패했습니다.');
         } finally {
             setIsSaving(false);
         }

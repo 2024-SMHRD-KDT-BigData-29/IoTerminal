@@ -1,11 +1,12 @@
 CREATE TABLE IF NOT EXISTS workflows (
-    id INT AUTO_INCREMENT PRIMARY KEY,
+    workflow_id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     description TEXT,
     nodes JSON NOT NULL,
     edges JSON NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    user_id INT,
-    is_public BOOLEAN DEFAULT false
+    user_id VARCHAR(50),
+    is_public BOOLEAN DEFAULT false,
+    FOREIGN KEY (user_id) REFERENCES user(user_id)
 ); 

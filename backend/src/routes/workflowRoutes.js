@@ -1,4 +1,6 @@
 const express = require('express');
+const router = express.Router();
+const jwt = require('jsonwebtoken');
 const { 
     createWorkflow, 
     getUserWorkflows,
@@ -7,31 +9,39 @@ const {
     deleteWorkflow 
 } = require('../controllers/workflowController');
 
-// Mock authentication middleware (very basic for presentation)
-const mockAuthMiddleware = (req, res, next) => {
+const JWT_SECRET = 'mock-jwt-secret-for-presentation';
+
+// 인증 미들웨어
+const authenticateToken = (req, res, next) => {
     const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer mockToken')) { // Expecting "Bearer mockToken..."
-        // In a real mock, you might decode a fake JWT or just assign a mock user
-        req.user = { userId: 'mockUser1', username: '김유진', role: 'PM' }; 
-        console.log('Mock Auth Middleware: User authenticated', req.user);
-    } else {
-        // For some GET routes, we might allow access or handle differently for mock
-        // For POST/PUT/DELETE, we might strictly require a token.
-        // For this mockup, we'll be less strict on GET if no token.
-        // If it's a modification route, you might want to return 401.
-        // For now, allow to proceed but req.user might be undefined.
-        // Controller must handle undefined req.user if not all routes are strictly protected.
-        // For simplicity, let's assume most routes that need user will use a default if not found.
-        console.log('Mock Auth Middleware: No or invalid token, proceeding without req.user for some routes.');
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+        return res.status(401).json({
+            success: false,
+            error: '인증 토큰이 필요합니다.'
+        });
     }
-    next();
+
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        req.user = decoded;
+        next();
+    } catch (error) {
+        console.error('토큰 검증 실패:', error);
+        return res.status(403).json({
+            success: false,
+            error: '유효하지 않은 토큰입니다.'
+        });
+    }
 };
 
-const router = express.Router();
-router.use(mockAuthMiddleware); // Apply mock auth to all workflow routes
+// 모든 워크플로우 라우트에 인증 미들웨어 적용
+router.use(authenticateToken);
 
-router.post('/', createWorkflow);
-router.get('/', getUserWorkflows);
+// 워크플로우 라우트
+router.post('/save', createWorkflow);
+router.get('/list', getUserWorkflows);
 router.get('/:workflowId', getWorkflowById);
 router.put('/:workflowId', updateWorkflow);
 router.delete('/:workflowId', deleteWorkflow);

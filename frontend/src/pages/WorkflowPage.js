@@ -22,13 +22,18 @@ function WorkflowPage() {
     const [isLoading, setIsLoading] = useState(true);
 
     const user = getCurrentUserData();
-    const userId = user?.userId || user?.id;
+    const userId = user?.user_id || user?.userId || user?.id;
 
     const [showImportModal, setShowImportModal] = useState(false);
 
     const [workflows, setWorkflows] = useState([]);
 
-    const fetchWorkflows = async () => {
+    const fetchWorkflows = useCallback(async () => {
+        if (!userId) {
+            console.error('사용자 ID가 없습니다.');
+            return;
+        }
+
         try {
             setIsLoading(true);
             const response = await getWorkflowList(userId);
@@ -40,11 +45,13 @@ function WorkflowPage() {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [userId]);
 
     useEffect(() => {
-        fetchWorkflows();
-    }, [userId]);
+        if (userId) {
+            fetchWorkflows();
+        }
+    }, [userId, fetchWorkflows]);
 
     // 워크플로우 로드 또는 새 워크플로우 초기화
     useEffect(() => {
@@ -203,7 +210,7 @@ function WorkflowPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {workflows.length > 0 ? (
                         workflows.map((workflow) => (
-                            <div key={workflow.id} className="bg-white dark:bg-[#3a2e5a] rounded-xl shadow-lg p-6">
+                            <div key={workflow.workflow_id} className="bg-white dark:bg-[#3a2e5a] rounded-xl shadow-lg p-6">
                                 <h3 className="text-lg font-semibold text-[#3a2e5a] dark:text-[#b39ddb] mb-2">
                                     {workflow.name}
                                 </h3>
@@ -212,13 +219,13 @@ function WorkflowPage() {
                                 </p>
                                 <div className="flex justify-end space-x-2">
                                     <button 
-                                        onClick={() => navigate(`/workflow/${workflow.id}`)}
+                                        onClick={() => navigate(`/workflow/edit/${workflow.workflow_id}`)}
                                         className="px-3 py-1 text-sm bg-[#7e57c2] dark:bg-[#9575cd] text-white rounded-lg hover:bg-[#5e35b1] dark:hover:bg-[#b39ddb] transition-colors duration-200"
                                     >
                                         편집
                                     </button>
                                     <button 
-                                        onClick={() => handleDeleteWorkflow(workflow.id)}
+                                        onClick={() => handleDeleteWorkflow(workflow.workflow_id)}
                                         className="px-3 py-1 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors duration-200"
                                     >
                                         삭제

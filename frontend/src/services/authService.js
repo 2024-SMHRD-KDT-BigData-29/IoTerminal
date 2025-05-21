@@ -1,10 +1,28 @@
-export const login = async (username, password) => {
-    // 더미 로그인: 아무 username/password나 통과
-    return Promise.resolve({
-        message: '로그인 성공',
-        token: 'dummy-token',
-        user: { username, name: username, email: username + '@example.com' }
-    });
+export const login = async (userId, password) => {
+    try {
+        const response = await fetch('http://localhost:3001/api/auth/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ userId, password })
+        });
+
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.message || '로그인에 실패했습니다.');
+        }
+
+        // 세션 스토리지에 저장
+        sessionStorage.setItem('user', JSON.stringify(data.user));
+        sessionStorage.setItem('token', data.token);
+        
+        return data;
+    } catch (error) {
+        console.error('로그인 오류:', error);
+        throw error;
+    }
 };
 
 export const register = async (userData) => {
@@ -45,15 +63,15 @@ export const register = async (userData) => {
 };
 
 export const getCurrentUserToken = () => {
-    return localStorage.getItem('token');
+    return sessionStorage.getItem('token');
 };
 
 export const getCurrentUserData = () => {
-    const user = localStorage.getItem('user');
+    const user = sessionStorage.getItem('user');
     return user ? JSON.parse(user) : null;
 };
 
 export const logout = () => {
-    // 더미 로그아웃
-    return Promise.resolve();
+    sessionStorage.removeItem('user');
+    sessionStorage.removeItem('token');
 }; 
