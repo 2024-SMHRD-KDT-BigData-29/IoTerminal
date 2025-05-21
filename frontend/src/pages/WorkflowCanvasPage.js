@@ -4,19 +4,85 @@ import { Plus, Save, Trash2, Upload } from 'lucide-react';
 import WorkflowCanvas from '../components/workflow/WorkflowCanvas';
 import NodePalette from '../components/workflow/NodePalette';
 import PropertyEditor from '../components/workflow/PropertyEditor';
+import { saveWorkflow, getWorkflowById } from '../api/workflow';
 
 const WorkflowCanvasPage = () => {
     const [elements, setElements] = useState([]);
     const [selectedNode, setSelectedNode] = useState(null);
     const [workflowName, setWorkflowName] = useState('새 워크플로우');
     const [showImportModal, setShowImportModal] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
     const navigate = useNavigate();
     const { workflowId } = useParams();
     const cyRef = useRef(null);
 
+    // 워크플로우 불러오기
+    useEffect(() => {
+        if (workflowId) {
+            const fetchWorkflow = async () => {
+                try {
+                    const response = await getWorkflowById(workflowId);
+                    if (response.success) {
+                        setWorkflowName(response.workflow.name);
+                        setElements([...response.workflow.nodes, ...response.workflow.edges]);
+                    }
+                } catch (error) {
+                    console.error('워크플로우 불러오기 실패:', error);
+                    alert('워크플로우를 불러오는데 실패했습니다.');
+                }
+            };
+            fetchWorkflow();
+        }
+    }, [workflowId]);
+
     const handleSaveWorkflow = async () => {
-        // TODO: API 호출하여 워크플로우 저장
-        console.log('Saving workflow:', { name: workflowName, elements });
+        if (!workflowName.trim()) {
+            alert('워크플로우 이름을 입력해주세요.');
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            let nodes = elements.filter(el => el.group === 'nodes');
+            let edges = elements.filter(el => el.group === 'edges');
+
+            // position 정보가 없는 노드가 있으면 Cytoscape에서 가져와서 추가
+            if (cyRef.current) {
+                nodes = nodes.map(node => {
+                    if (!node.position) {
+                        const cyNode = cyRef.current.getElementById(node.data.id);
+                        if (cyNode && cyNode.position) {
+                            return { ...node, position: cyNode.position() };
+                        }
+                    }
+                    return node;
+                });
+            }
+
+            const workflowData = {
+                name: workflowName,
+                description: '',
+                nodes: nodes,
+                edges: edges,
+                userId: 1, // TODO: 실제 사용자 ID로 변경
+                isPublic: false
+            };
+
+            console.log('저장될 워크플로우 데이터:', workflowData); // 디버깅용
+
+            const response = await saveWorkflow(workflowData);
+            if (response.success) {
+                alert('워크플로우가 저장되었습니다.');
+                if (!workflowId) {
+                    navigate(`/workflow/${response.workflowId}`);
+                }
+            }
+        } catch (error) {
+            console.error('워크플로우 저장 실패:', error);
+            alert('워크플로우 저장에 실패했습니다.');
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const handleClearCanvas = () => {
@@ -108,10 +174,11 @@ const WorkflowCanvasPage = () => {
                 <div className="flex items-center space-x-2">
                     <button
                         onClick={handleSaveWorkflow}
-                        className="flex items-center px-3 py-2 bg-[#7e57c2] dark:bg-[#9575cd] text-white rounded-xl hover:bg-[#5e35b1] dark:hover:bg-[#b39ddb] transition-colors duration-200"
+                        disabled={isSaving}
+                        className={`flex items-center px-3 py-2 bg-[#7e57c2] dark:bg-[#9575cd] text-white rounded-xl hover:bg-[#5e35b1] dark:hover:bg-[#b39ddb] transition-colors duration-200 ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                         <Save size={20} className="mr-2" />
-                        저장
+                        {isSaving ? '저장 중...' : '저장'}
                     </button>
                     <button
                         onClick={handleImportWorkflow}

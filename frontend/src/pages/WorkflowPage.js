@@ -8,6 +8,7 @@ import PropertyEditor from '../components/workflow/PropertyEditor';
 import { Box, Plus, Save, Trash2, Upload } from 'lucide-react'; // 사용되는 아이콘만
 import { saveWorkflow, getWorkflows, getWorkflowById, updateWorkflow } from '../services/workflowService';
 import { getCurrentUserData } from '../services/authService';
+import { getWorkflowList, deleteWorkflow } from '../api/workflow';
 
 function WorkflowPage() {
     const [elements, setElements] = useState([]);
@@ -18,12 +19,32 @@ function WorkflowPage() {
     const [selectedNode, setSelectedNode] = useState(null); // 이 상태가 핵심
     const cyRef = useRef(null); // Cytoscape 인스턴스용 ref
     const [isSaving, setIsSaving] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
 
     const currentUserData = getCurrentUserData();
     const username = currentUserData?.username || '사용자';
 
     const [showImportModal, setShowImportModal] = useState(false);
+
+    const [workflows, setWorkflows] = useState([]);
+
+    const fetchWorkflows = async () => {
+        try {
+            setIsLoading(true);
+            const response = await getWorkflowList(1); // TODO: 실제 사용자 ID로 변경
+            if (response.success) {
+                setWorkflows(response.workflows);
+            }
+        } catch (error) {
+            console.error('워크플로우 목록 조회 실패:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchWorkflows();
+    }, []);
 
     // 워크플로우 로드 또는 새 워크플로우 초기화
     useEffect(() => {
@@ -68,7 +89,6 @@ function WorkflowPage() {
             }
         }
     }, [workflowId, navigate]); // workflowId 변경 시 실행
-
 
     // Cytoscape에서 노드 클릭 시 selectedNode 업데이트
     const handleCyInit = useCallback((cy) => {
@@ -132,12 +152,26 @@ function WorkflowPage() {
     };
 
     const handleNewWorkflow = () => {
-        // 새 워크플로우 생성 페이지로 이동
         navigate('/workflow/new');
     };
 
     const handleImportWorkflow = () => {
         setShowImportModal(true);
+    };
+
+    const handleDeleteWorkflow = async (workflowId) => {
+        if (window.confirm('정말로 이 워크플로우를 삭제하시겠습니까?')) {
+            try {
+                const response = await deleteWorkflow(workflowId);
+                if (response.success) {
+                    alert('워크플로우가 삭제되었습니다.');
+                    fetchWorkflows(); // 목록 새로고침
+                }
+            } catch (error) {
+                console.error('워크플로우 삭제 실패:', error);
+                alert('워크플로우 삭제에 실패했습니다.');
+            }
+        }
     };
 
     if (isLoading && workflowId) {
@@ -167,26 +201,38 @@ function WorkflowPage() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {/* 워크플로우 카드 예시 */}
-                    <div className="bg-white dark:bg-[#3a2e5a] rounded-xl shadow-lg p-6">
-                        <h3 className="text-lg font-semibold text-[#3a2e5a] dark:text-[#b39ddb] mb-2">
-                            예시 워크플로우
-                        </h3>
-                        <p className="text-[#9575cd] dark:text-[#b39ddb] text-sm mb-4">
-                            마지막 수정: 2024-03-21
-                        </p>
-                        <div className="flex justify-end space-x-2">
-                            <button 
-                                onClick={() => navigate('/workflow/edit/1')}
-                                className="px-3 py-1 text-sm bg-[#7e57c2] dark:bg-[#9575cd] text-white rounded-lg hover:bg-[#5e35b1] dark:hover:bg-[#b39ddb] transition-colors duration-200"
-                            >
-                                편집
-                            </button>
-                            <button className="px-3 py-1 text-sm bg-[#9575cd] dark:bg-[#b39ddb] text-white rounded-lg hover:bg-[#7e57c2] dark:hover:bg-[#ede7f6] transition-colors duration-200">
-                                삭제
-                            </button>
+                    {workflows.length > 0 ? (
+                        workflows.map((workflow) => (
+                            <div key={workflow.id} className="bg-white dark:bg-[#3a2e5a] rounded-xl shadow-lg p-6">
+                                <h3 className="text-lg font-semibold text-[#3a2e5a] dark:text-[#b39ddb] mb-2">
+                                    {workflow.name}
+                                </h3>
+                                <p className="text-[#9575cd] dark:text-[#b39ddb] text-sm mb-4">
+                                    마지막 수정: {new Date(workflow.updated_at).toLocaleDateString()}
+                                </p>
+                                <div className="flex justify-end space-x-2">
+                                    <button 
+                                        onClick={() => navigate(`/workflow/${workflow.id}`)}
+                                        className="px-3 py-1 text-sm bg-[#7e57c2] dark:bg-[#9575cd] text-white rounded-lg hover:bg-[#5e35b1] dark:hover:bg-[#b39ddb] transition-colors duration-200"
+                                    >
+                                        편집
+                                    </button>
+                                    <button 
+                                        onClick={() => handleDeleteWorkflow(workflow.id)}
+                                        className="px-3 py-1 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors duration-200"
+                                    >
+                                        삭제
+                                    </button>
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        <div className="col-span-full text-center py-12">
+                            <p className="text-[#9575cd] dark:text-[#b39ddb]">
+                                저장된 워크플로우가 없습니다.
+                            </p>
                         </div>
-                    </div>
+                    )}
                 </div>
             </div>
         </div>
