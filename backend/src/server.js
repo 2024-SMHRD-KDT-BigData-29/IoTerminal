@@ -13,18 +13,39 @@ const httpServer = http.createServer(app);
 
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
 
+// const io = new Server(httpServer, {
+//     cors: {
+//         origin: FRONTEND_URL,
+//         methods: ["GET", "POST"]
+//     }
+// });
+
 const io = new Server(httpServer, {
     cors: {
-        origin: FRONTEND_URL,
-        methods: ["GET", "POST"]
+        origin: ["http://localhost:3000", "http://localhost:3001"],
+        methods: ["GET", "POST"],
+        credentials: true
     }
 });
 
+// Express 앱 CORS 설정 (REST API 요청에 적용)
+// Socket.IO 설정과 별개로 Express 앱 미들웨어에 적용해야 합니다.
+app.use(cors({
+    origin: ["http://localhost:3000", "http://localhost:3001"],
+    credentials: true
+}));
+
 const PORT = process.env.PORT || 3001;
 
-app.use(cors({ origin: FRONTEND_URL }));
+// app.use(cors({ origin: FRONTEND_URL }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+    console.log('Request Body:', req.body);
+    next();
+});
 
 app.use('/api/auth', authRoutes);
 app.use('/api/workflows', workflowRoutes);
@@ -59,16 +80,16 @@ const sensorDataInterval = setInterval(() => {
     io.emit('newSensorData', sensorData);
 }, 2000);
 
-const cleanup = () => {
-    console.log('Cleaning up mock server resources...');
-    clearInterval(sensorDataInterval);
-    httpServer.close(() => {
-        console.log('HTTP server closed.');
-        process.exit(0);
-    });
-};
-process.on('SIGINT', cleanup);
-process.on('SIGTERM', cleanup);
+// const cleanup = () => {
+//     console.log('Cleaning up mock server resources...');
+//     clearInterval(sensorDataInterval);
+//     // httpServer.close(() => {
+//     //     console.log('HTTP server closed.');
+//     //     process.exit(0);
+//     // });
+// };
+// process.on('SIGINT', cleanup);
+// process.on('SIGTERM', cleanup);
 
 httpServer.listen(PORT, () => {
   console.log(`Mock Backend server (Socket.IO) running on port ${PORT}`);

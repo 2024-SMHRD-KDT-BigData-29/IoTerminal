@@ -7,11 +7,41 @@ export const login = async (username, password) => {
     });
 };
 
-export const register = async (username, password) => {
-    return Promise.resolve({
-        message: '회원가입 성공',
-        userId: Date.now().toString()
-    });
+export const register = async (userData) => {
+    try {
+        console.log('회원가입 요청 데이터:', userData);
+        const response = await fetch('http://localhost:3001/api/auth/register', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+                userId: userData.userId,
+                password: userData.password,
+                name: userData.name,
+                email: userData.email,
+                phone: userData.phone || ''
+            })
+        });
+
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            throw new Error('서버 응답이 JSON 형식이 아닙니다.');
+        }
+
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.message || '회원가입에 실패했습니다.');
+        }
+
+        return data;
+    } catch (error) {
+        console.error('회원가입 오류:', error);
+        throw error;
+    }
 };
 
 export const getCurrentUserToken = () => {

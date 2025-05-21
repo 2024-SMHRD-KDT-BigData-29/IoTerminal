@@ -80,7 +80,15 @@ const RegisterPage = () => {
         e.preventDefault();
         setError('');
 
-        if (formData.password !== formData.confirmPassword) {
+        // 폼에서 직접 비밀번호와 비밀번호 확인 값을 가져와 비교
+        const password = e.target.password.value;
+        const confirmPassword = e.target.confirmPassword.value;
+
+        console.log('Password:', password, 'Type:', typeof password, 'Length:', password.length);
+        console.log('Confirm Password:', confirmPassword, 'Type:', typeof confirmPassword, 'Length:', confirmPassword.length);
+        console.log('Passwords match check:', password === confirmPassword);
+
+        if (password !== confirmPassword) {
             setError('비밀번호가 일치하지 않습니다.');
             return;
         }
@@ -113,7 +121,7 @@ const RegisterPage = () => {
                     </p>
                 </div>
 
-                <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+                <form onSubmit={handleSubmit} className="mt-8 space-y-6">
                     {error && (
                         <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-3 rounded-xl text-sm">
                             {error}
