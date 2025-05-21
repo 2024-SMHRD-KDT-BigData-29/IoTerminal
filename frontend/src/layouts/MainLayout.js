@@ -17,7 +17,8 @@ import {
     HelpCircle,
     LogOut,
     Moon, // 다크모드 아이콘 (예시, 필요시 Sun 아이콘도 추가)
-    Sun // 라이트모드 아이콘 (예시)
+    Sun, // 라이트모드 아이콘 (예시)
+    LineChart // 데이터 분석 아이콘 추가
 } from 'lucide-react';
 import { getCurrentUserData, logout } from '../services/authService';
 
@@ -101,12 +102,12 @@ const MainLayout = () => {
         { path: '/dashboard', icon: <Activity size={20} />, text: '대시보드' },
         { path: '/workflow', icon: <Box size={20} />, text: '워크플로우' },
         {
-            path: '/iot-devices', // 부모 경로도 유효하게
+            path: '/iot/devices',
             icon: <BarChart size={20} />,
             text: 'IoT 디바이스',
             submenu: [
-                { path: '/iot-devices/management', text: '디바이스 관리' }, // 경로 수정 예시
-                { path: '/iot-devices/data', text: '데이터 관리' }
+                { path: '/iot/devices/management', text: '디바이스 관리' },
+                { path: '/iot/devices/analysis', text: '데이터 분석' }
             ]
         },
         { path: '/settings', icon: <Settings size={20} />, text: '설정' },

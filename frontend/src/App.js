@@ -10,6 +10,7 @@ import WorkflowCanvasPage from './pages/WorkflowCanvasPage';
 import DataManagementPage from './pages/DataManagementPage';
 import IotDevicesPage from './pages/IotDevicesPage';
 import SettingsPage from './pages/SettingsPage';
+import DataAnalysisPage from './pages/DataAnalysisPage';
 import { getCurrentUserToken } from './services/authService';
 
 const PrivateRoutes = () => {
@@ -32,8 +33,9 @@ function App() {
                     <Route path="/workflow" element={<WorkflowPage />} />
                     <Route path="/workflow/new" element={<WorkflowCanvasPage />} />
                     <Route path="/workflow/edit/:workflowId" element={<WorkflowCanvasPage />} />
-                    <Route path="/iot-devices" element={<IotDevicesPage />} />
-                    <Route path="/iot-devices/data" element={<DataManagementPage />} />
+                    <Route path="/iot/devices" element={<IotDevicesPage />} />
+                    <Route path="/iot/devices/management" element={<IotDevicesPage />} />
+                    <Route path="/iot/devices/analysis" element={<DataAnalysisPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                 </Route>
 
