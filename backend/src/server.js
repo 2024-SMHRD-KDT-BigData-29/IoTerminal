@@ -10,26 +10,28 @@ const authRoutes = require('./routes/authRoutes');
 const workflowRoutes = require('./routes/workflowRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const calendarRoutes = require('./routes/calendarRoutes');
+const weatherRoutes = require('../routes/weather'); // 날씨 API 라우터 추가
 
 const app = express();
 const httpServer = http.createServer(app);
 
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
 
+// CORS 설정 업데이트
+const corsOptions = {
+    origin: [FRONTEND_URL, "http://localhost:3000", "http://localhost:3001"],
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"]
+};
+
+// Socket.IO CORS 설정
 const io = new Server(httpServer, {
-    cors: {
-        origin: ["http://localhost:3000", "http://localhost:3001"],
-        methods: ["GET", "POST"],
-        credentials: true
-    }
+    cors: corsOptions
 });
 
-// Express 앱 CORS 설정 (REST API 요청에 적용)
-// Socket.IO 설정과 별개로 Express 앱 미들웨어에 적용해야 합니다.
-app.use(cors({
-    origin: ["http://localhost:3000", "http://localhost:3001"],
-    credentials: true
-}));
+// Express 앱 CORS 설정
+app.use(cors(corsOptions));
 
 const PORT = process.env.PORT || 3001;
 
@@ -38,7 +40,9 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use((req, res, next) => {
     console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
-    console.log('Request Body:', req.body);
+    if (req.body && Object.keys(req.body).length > 0) {
+        console.log('Request Body:', req.body);
+    }
     next();
 });
 
@@ -46,6 +50,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/workflow', workflowRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/calendar', calendarRoutes);
+app.use('/api/weather', weatherRoutes); // 날씨 API 라우터 등록
 
 app.get('/', (req, res) => {
   res.send('IoT Hub System Backend - MOCKUP MODE');

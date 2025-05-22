@@ -31,6 +31,8 @@ function App() {
                     <Route path="/" element={<Navigate to="/dashboard" replace />} />
                     <Route path="/dashboard" element={<DashboardPage />} />
                     <Route path="/workflow" element={<WorkflowPage />} />
+                    <Route path="/workflow/:workflowId" element={<WorkflowPage />} />
+                    <Route path="/workflow/name/:workflowName" element={<WorkflowPage />} />
                     <Route path="/workflow/new" element={<WorkflowCanvasPage />} />
                     <Route path="/workflow/edit/:workflowId" element={<WorkflowCanvasPage />} />
                     <Route path="/iot/devices" element={<IotDevicesPage />} />

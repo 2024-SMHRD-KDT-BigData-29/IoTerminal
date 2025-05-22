@@ -7,75 +7,203 @@ import {
 } from 'recharts';
 import io from 'socket.io-client';
 import { 
-    Activity, Database, Shield, Globe, Thermometer, Droplet, Zap, Wind, AlertTriangle
+    Activity, Database, Shield, Globe, Thermometer, Droplet, Zap, Wind, AlertTriangle, Cloud
 } from 'lucide-react'; // ChevronRight는 JSX에서 사용되지 않아 일단 제거
 import { getDashboardSummary, getSensorStatuses, getRecentWorkflowsForDashboard, getApiStatusesForDashboard } from '../services/dashboardService';
-import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
-import format from 'date-fns/format';
-import parse from 'date-fns/parse';
-import startOfWeek from 'date-fns/startOfWeek';
-import getDay from 'date-fns/getDay';
-import ko from 'date-fns/locale/ko';
+import { Calendar, momentLocalizer } from 'react-big-calendar';
+import moment from 'moment';
+import 'moment/locale/ko';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { getCalendarEvents, createCalendarEvent, updateCalendarEvent, deleteCalendarEvent } from '../services/calendarService';
 import { getCurrentUserData } from '../services/authService';
+import { getRecentWorkflows } from '../api/workflow';
+
+moment.locale('ko');
+const localizer = momentLocalizer(moment);
 
 const SOCKET_SERVER_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:3001';
-const MAX_DATA_POINTS_LINE_CHART = 30;
+const MAX_DATA_POINTS_LINE_CHART = 20;
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
 
-const locales = { 'ko': ko };
-const localizer = dateFnsLocalizer({ format, parse, startOfWeek, getDay, locales });
+const SummaryCard = ({ title, value, icon: Icon, trend, trendValue }) => (
+    <div className="bg-white dark:bg-[#3a2e5a] p-6 rounded-xl shadow-sm">
+        <div className="flex items-center justify-between">
+            <div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{title}</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-white mt-1">{value}</p>
+            </div>
+            <div className="h-12 w-12 rounded-full bg-violet-100 dark:bg-[#9575cd] flex items-center justify-center">
+                <Icon className="h-6 w-6 text-violet-600 dark:text-violet-200" />
+            </div>
+        </div>
+        {trend && (
+            <div className="mt-4 flex items-center">
+                <span className={`text-sm ${trend === 'up' ? 'text-green-500' : 'text-red-500'}`}>
+                    {trend === 'up' ? '↑' : '↓'} {trendValue}
+                </span>
+                <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">vs last period</span>
+            </div>
+        )}
+    </div>
+);
 
-// --- Reusable Components (실제 예시 정의) ---
-const SummaryCard = ({ title, value, change, up, icon }) => {
-    return (
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300">
+const SensorStatusItem = ({ name, value, unit, status, icon: Icon }) => (
+    <div className="bg-white dark:bg-[#3a2e5a] p-4 rounded-xl shadow-sm">
+        <div className="flex items-center justify-between">
             <div className="flex items-center">
-                {icon && <div className="p-3 bg-purple-100 dark:bg-purple-500/20 rounded-lg mr-4">{icon}</div>}
-                <div>
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{title}</p>
-                    <p className="text-2xl font-bold text-gray-800 dark:text-white">{value}</p>
-                    {change && (
-                        <p className={`text-xs font-medium ${up ? 'text-green-500 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
-                            {change}
-                        </p>
-                    )}
+                <div className="h-10 w-10 rounded-full bg-violet-100 dark:bg-[#9575cd] flex items-center justify-center">
+                    <Icon className="h-5 w-5 text-violet-600 dark:text-violet-200" />
+                </div>
+                <div className="ml-3">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">{name}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{value}{unit}</p>
                 </div>
             </div>
+            <span className={`px-2 py-1 text-xs rounded-full ${
+                status === 'normal' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                status === 'warning' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+                'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+            }`}>
+                {status === 'normal' ? '정상' : status === 'warning' ? '주의' : '경고'}
+            </span>
         </div>
-    );
-};
+    </div>
+);
 
-const SensorStatusItem = ({ name, status, value, IconComponent }) => {
+const WorkflowItem = ({ name, status, lastRun }) => (
+    <div className="bg-white dark:bg-[#3a2e5a] p-4 rounded-xl shadow-sm">
+        <div className="flex items-center justify-between">
+            <div>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">{name}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                    마지막 실행: {lastRun}
+                </p>
+            </div>
+            <div className="text-right">
+                <span className={`px-2 py-1 text-xs rounded-full ${
+                    status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                    status === 'paused' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+                    'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+                }`}>
+                    {status === 'active' ? '실행 중' : status === 'paused' ? '일시 중지' : '중지됨'}
+                </span>
+            </div>
+        </div>
+    </div>
+);
+
+// 날씨 카드 컴포넌트
+const WeatherCard = () => {
+    const [weather, setWeather] = useState(null);
+    const [locationError, setLocationError] = useState(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const getWeather = async (latitude, longitude) => {
+            try {
+                const response = await fetch(
+                    `${API_URL}/weather/current?lat=${latitude}&lon=${longitude}`
+                );
+                const result = await response.json();
+                if (!result.success) {
+                    throw new Error(result.message || '날씨 정보를 가져오는데 실패했습니다.');
+                }
+                setWeather(result.data);
+            } catch (error) {
+                setLocationError(`날씨 정보를 불러올 수 없습니다: ${error.message}`);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (!navigator.geolocation) {
+            setLocationError('위치 정보 사용 불가');
+            setLoading(false);
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const { latitude, longitude } = position.coords;
+                getWeather(latitude, longitude);
+            },
+            (error) => {
+                setLocationError('위치 권한이 필요합니다.');
+                setLoading(false);
+            }
+        );
+    }, []);
+
+    // 날씨 아이콘 URL 생성
+    const getWeatherIconUrl = (iconCode) => {
+        return `https://openweathermap.org/img/wn/${iconCode}@2x.png`;
+    };
+
+    if (loading) {
+        return (
+            <div className="bg-white dark:bg-[#3a2e5a] p-6 rounded-xl shadow-sm">
+                <h3 className="text-sm text-gray-500 dark:text-gray-400 mb-1">현재 날씨</h3>
+                <div className="flex items-center justify-center h-16">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-500"></div>
+                </div>
+            </div>
+        );
+    }
+
+    if (locationError) {
+        return (
+            <div className="bg-white dark:bg-[#3a2e5a] p-6 rounded-xl shadow-sm">
+                <h3 className="text-sm text-gray-500 dark:text-gray-400 mb-1">현재 날씨</h3>
+                <div className="flex items-center">
+                    <p className="text-2xl font-semibold text-red-500 dark:text-red-400">{locationError}</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (!weather) {
+        return (
+            <div className="bg-white dark:bg-[#3a2e5a] p-6 rounded-xl shadow-sm">
+                <h3 className="text-sm text-gray-500 dark:text-gray-400 mb-1">현재 날씨</h3>
+                <div className="flex items-center">
+                    <p className="text-2xl font-semibold text-gray-900 dark:text-white">날씨 정보가 없습니다</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-2.5 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 cursor-pointer">
+        <div className="bg-white dark:bg-[#3a2e5a] p-6 rounded-xl shadow-sm">
+            <h3 className="text-sm text-gray-500 dark:text-gray-400 mb-1">현재 날씨</h3>
             <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                    <div className="p-1.5 bg-purple-100 dark:bg-purple-500/20 rounded-md">
-                        {IconComponent && <IconComponent size={18} className="text-purple-600 dark:text-purple-400" />}
-                    </div>
-                    <div>
-                        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-200">{name}</h4>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{value}</p>
-                    </div>
+                <div>
+                    <p className="text-2xl font-semibold text-blue-700 dark:text-blue-200">
+                        {Math.round(weather.temperature)}°C
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {weather.city}
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {weather.description}
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                        습도: {weather.humidity}%
+                    </p>
                 </div>
-                <div className={`px-1.5 py-0.5 rounded-full text-xs font-medium ${status === 'active' ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400'}`}>
-                    {status === 'active' ? '정상' : '오류'}
+                <div className="flex flex-col items-center">
+                    <img 
+                        src={getWeatherIconUrl(weather.icon)} 
+                        alt={weather.description}
+                        className="w-16 h-16"
+                    />
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        풍속: {weather.windSpeed} m/s
+                    </p>
                 </div>
             </div>
         </div>
     );
 };
-
-const WorkflowItem = ({ name, time }) => {
-    return (
-        <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200">
-            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate mb-1">{name}</h4>
-            <p className="text-xs text-gray-500 dark:text-gray-400">마지막 수정: {time}</p>
-        </div>
-    );
-};
-// --- End Reusable Components ---
 
 function DashboardPage() {
     const [liveSensorData, setLiveSensorData] = useState([]);
@@ -154,30 +282,31 @@ function DashboardPage() {
     const [recentWorkflows, setRecentWorkflows] = useState([]);
     useEffect(() => {
         const loadRecentWorkflows = async () => {
-            console.log("[DashboardPage] LoadRecentWorkflows: Attempting to load..."); // 1. 함수 시작 로그
-            setIsLoadingWorkflows(true); 
+            setIsLoadingWorkflows(true);
             try {
-                const workflowsArray = await getRecentWorkflowsForDashboard(); 
-                console.log("[DashboardPage] LoadRecentWorkflows: Raw response from API:", JSON.stringify(workflowsArray, null, 2)); // 2. API 원본 데이터
-
-                if (Array.isArray(workflowsArray)) {
-                    console.log("[DashboardPage] LoadRecentWorkflows: Response is an array. Count:", workflowsArray.length); // 3. 배열 확인 및 개수
-                    console.log("[DashboardPage] LoadRecentWorkflows: Setting recentWorkflows state with (full array):", JSON.stringify(workflowsArray, null, 2)); // 4. 상태 설정 전 데이터
-                    setRecentWorkflows(workflowsArray);
-                } else {
-                    console.error('[DashboardPage] LoadRecentWorkflows: Data is not an array or API call failed:', workflowsArray); // 5. 배열 아닐 시
-                    setRecentWorkflows([]); 
+                const response = await getRecentWorkflows();
+                let workflows = [];
+                if (response && Array.isArray(response.workflows)) {
+                    workflows = response.workflows;
+                } else if (Array.isArray(response)) {
+                    workflows = response;
                 }
+                // 내 워크플로우만 필터링
+                const myWorkflows = workflows.filter(
+                    w => w.userId === userId || w.user_id === userId
+                );
+                // 최신순 정렬 (lastRun, updatedAt, createdAt 중 하나)
+                myWorkflows.sort((a, b) => new Date(b.lastRun || b.updatedAt || b.createdAt) - new Date(a.lastRun || a.updatedAt || a.createdAt));
+                // 상위 3개만
+                setRecentWorkflows(myWorkflows.slice(0, 3));
             } catch (error) {
-                console.error('[DashboardPage] LoadRecentWorkflows: Exception caught:', error); // 6. 예외 발생 시
-                setRecentWorkflows([]); 
+                setRecentWorkflows([]);
             } finally {
-                setIsLoadingWorkflows(false); 
-                console.log("[DashboardPage] LoadRecentWorkflows: Finished. isLoadingWorkflows set to false."); // 7. 로딩 완료
+                setIsLoadingWorkflows(false);
             }
         };
         loadRecentWorkflows();
-    }, []);
+    }, [userId]);
 
     // Socket.IO 연결
     useEffect(() => {
@@ -287,10 +416,10 @@ function DashboardPage() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <SummaryCard title="활성 센서" value={summaryData.activeSensors} change="+2" up={true} icon={<Activity size={20} className="text-blue-500" />} />
-                <SummaryCard title="수집 데이터 (오늘)" value={summaryData.dataCollected} change="+12%" up={true} icon={<Database size={20} className="text-green-500" />} />
-                <SummaryCard title="오류율" value={summaryData.errorRate} change="-0.6%" up={false} icon={<Shield size={20} className="text-red-500" />} />
-                <SummaryCard title="API 호출 (오늘)" value={summaryData.apiCalls} change="+5%" up={true} icon={<Globe size={20} className="text-purple-500" />} />
+                <SummaryCard title="활성 센서" value={summaryData.activeSensors} change="+2" up={true} icon={Activity} />
+                <SummaryCard title="수집 데이터 (오늘)" value={summaryData.dataCollected} change="+12%" up={true} icon={Database} />
+                <SummaryCard title="오류율" value={summaryData.errorRate} change="-0.6%" up={false} icon={Shield} />
+                <WeatherCard />
             </div>
             
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -337,7 +466,7 @@ function DashboardPage() {
                                   name={sensor.name}
                                   status={sensor.status}
                                   value={sensor.value}
-                                  IconComponent={getIconComponentForSensor(sensor.name)}
+                                  icon={getIconComponentForSensor(sensor.name)}
                                 />
                             )) : (
                                 <div className="text-xs text-gray-500 dark:text-gray-400 py-3 text-center bg-gray-50 dark:bg-gray-700/30 rounded-lg">
@@ -388,27 +517,24 @@ function DashboardPage() {
                     </Link>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {/* 7. isLoadingWorkflows 상태 확인 로그 (JSX용) */}
-                    {isLoadingWorkflows && console.log("[DashboardPage] Rendering Workflows JSX: isLoadingWorkflows is TRUE")}
-                    {!isLoadingWorkflows && recentWorkflows.length > 0 && console.log("[DashboardPage] Rendering Workflows JSX: Found workflows, count:", recentWorkflows.length)}
-                    {!isLoadingWorkflows && recentWorkflows.length === 0 && console.log("[DashboardPage] Rendering Workflows JSX: No workflows to display (length is 0, not loading).")}
-
                     {isLoadingWorkflows ? ( 
                          <div className="col-span-full flex justify-center py-6">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
                         </div>
-                    ) : recentWorkflows.length > 0 ? (
-                        recentWorkflows.slice(0, 3).map((workflow, idx) => {
-                            // 8. map 함수 내부에서 각 workflow 객체 확인 로그
-                            console.log(`[DashboardPage] Rendering Workflows JSX: Mapping workflow item ${idx}:`, JSON.stringify(workflow, null, 2));
-                            return (
+                    ) : recentWorkflows && recentWorkflows.length > 0 ? (
+                        recentWorkflows.map((workflow, idx) => (
+                            <Link
+                                key={workflow.workflow_id || workflow.id || idx}
+                                to={`/workflow/edit/${workflow.workflow_id || workflow.id}`}
+                                style={{ textDecoration: 'none' }}
+                            >
                                 <WorkflowItem
-                                    key={workflow.id || workflow.workflow_id || `workflow-${idx}`}
                                     name={workflow.name}
-                                    time={workflow.updated_at ? new Date(workflow.updated_at).toLocaleDateString() : 'N/A'}
+                                    status={workflow.status || 'active'}
+                                    lastRun={workflow.updated_at ? new Date(workflow.updated_at).toLocaleString() : '실행 기록 없음'}
                                 />
-                            );
-                        })
+                            </Link>
+                        ))
                     ) : (
                         <div className="col-span-full text-center py-6 text-sm text-gray-500 dark:text-gray-400">
                             최근 워크플로우가 없습니다.
@@ -436,7 +562,7 @@ function DashboardPage() {
                                 <div>
                                     <label htmlFor="eventStart" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">시작 시간</label>
                                     <input id="eventStart" type="datetime-local" 
-                                        value={newEvent.start ? format(newEvent.start, "yyyy-MM-dd'T'HH:mm") : ''}
+                                        value={newEvent.start ? moment(newEvent.start).format('YYYY-MM-DDTHH:mm') : ''}
                                         onChange={(e) => setNewEvent({ ...newEvent, start: e.target.value ? new Date(e.target.value) : null })}
                                         className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200 focus:ring-purple-500 focus:border-purple-500"
                                     />
@@ -444,7 +570,7 @@ function DashboardPage() {
                                 <div>
                                     <label htmlFor="eventEnd" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">종료 시간</label>
                                     <input id="eventEnd" type="datetime-local" 
-                                        value={newEvent.end ? format(newEvent.end, "yyyy-MM-dd'T'HH:mm") : ''}
+                                        value={newEvent.end ? moment(newEvent.end).format('YYYY-MM-DDTHH:mm') : ''}
                                         onChange={(e) => setNewEvent({ ...newEvent, end: e.target.value ? new Date(e.target.value) : null })}
                                         className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200 focus:ring-purple-500 focus:border-purple-500"
                                     />
