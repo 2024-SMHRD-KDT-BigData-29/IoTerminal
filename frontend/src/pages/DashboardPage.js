@@ -7,10 +7,9 @@ import {
 } from 'recharts';
 import io from 'socket.io-client';
 import { 
-    Activity, Database, Shield, Globe, Thermometer, Droplet, Zap, Wind, AlertTriangle, ChevronRight
-} from 'lucide-react';
+    Activity, Database, Shield, Globe, Thermometer, Droplet, Zap, Wind, AlertTriangle
+} from 'lucide-react'; // ChevronRight는 JSX에서 사용되지 않아 일단 제거
 import { getDashboardSummary, getSensorStatuses, getRecentWorkflowsForDashboard, getApiStatusesForDashboard } from '../services/dashboardService';
-// import { getRecentWorkflows } from '../api/workflow'; // 주석 처리된 원래 상태 유지
 import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
 import format from 'date-fns/format';
 import parse from 'date-fns/parse';
@@ -68,28 +67,11 @@ const SensorStatusItem = ({ name, status, value, IconComponent }) => {
     );
 };
 
-const WorkflowItem = ({ name, time, status, statusColor = 'text-gray-500' }) => { // status, statusColor props 추가
+const WorkflowItem = ({ name, time }) => {
     return (
         <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200">
-            <div className="flex justify-between items-start">
-                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate mb-1">{name}</h4>
-                {status && <span className={`text-xs ${statusColor}`}>{status}</span>}
-            </div>
+            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate mb-1">{name}</h4>
             <p className="text-xs text-gray-500 dark:text-gray-400">마지막 수정: {time}</p>
-        </div>
-    );
-};
-
-const ApiItem = ({ name, status, statusColor, calls }) => { // ApiItem 정의 추가
-    return (
-        <div className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg">
-            <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-700 dark:text-gray-200">{name}</span>
-                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusColor}`}>
-                    {status}
-                </span>
-            </div>
-            {calls && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">호출: {calls}</p>}
         </div>
     );
 };
@@ -102,152 +84,138 @@ function DashboardPage() {
 
     const [summaryData, setSummaryData] = useState({ activeSensors: 0, dataCollected: "0", errorRate: "0%", apiCalls: "0" });
     const [sensorStatuses, setSensorStatuses] = useState([]);
-    const [recentWorkflows, setRecentWorkflows] = useState([]);
     const [apiStatuses, setApiStatuses] = useState([]);
-    const [dateRangeFilter, setDateRangeFilter] = useState('today');
-    const [isLoading, setIsLoading] = useState(true); // 워크플로우 등 로딩
+    const [isLoadingWorkflows, setIsLoadingWorkflows] = useState(true); // 워크플로우 전용 로딩 상태
     const navigate = useNavigate();
 
     const [events, setEvents] = useState([]);
     const [isLoadingEvents, setIsLoadingEvents] = useState(true);
-    const currentUser = getCurrentUserData(); // user -> currentUser
+    const currentUser = getCurrentUserData();
     const userId = currentUser?.user_id;
-    
 
-    // 캘린더 이벤트 로드 (이전 단순 버전)
+    // 캘린더 이벤트 로드
     useEffect(() => {
         const loadCalendarEvents = async () => {
             try {
                 setIsLoadingEvents(true);
-                // getCalendarEvents()는 {success: true, events: [...]} 형태를 반환한다고 가정
-                const responseData = await getCalendarEvents();
-                console.log("[DashboardPage] Raw events data from backend (reverted version):", JSON.stringify(responseData, null, 2));
-
+                const responseData = await getCalendarEvents(); 
+                console.log("[DashboardPage] Raw events data from backend:", JSON.stringify(responseData, null, 2));
                 if (responseData && responseData.success && Array.isArray(responseData.events)) {
                     const formattedEvents = responseData.events.map((event, idx) => {
-                        const startDate = event.start ? new Date(event.start) : null;
-                        const endDate = event.end ? new Date(event.end) : null;
-
+                        const parseDateTimeStringAsUTC = (dateTimeString) => {
+                            if (!dateTimeString || typeof dateTimeString !== 'string') return null;
+                            if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}$/.test(dateTimeString)) {
+                                return new Date(dateTimeString.replace(' ', 'T') + 'Z');
+                            }
+                            const parsedDate = new Date(dateTimeString); 
+                            return isNaN(parsedDate.getTime()) ? null : parsedDate;
+                        };
+                        const startDate = parseDateTimeStringAsUTC(event.start);
+                        const endDate = parseDateTimeStringAsUTC(event.end);
                         if (!startDate || isNaN(startDate.getTime()) || !endDate || isNaN(endDate.getTime())) {
-                            console.error("!!! [DashboardPage] Invalid Date object created for event (reverted version):", event);
-                            return null; 
+                            console.error("!!! [DashboardPage] Invalid Date object created for calendar event:", event);
+                            return null;
                         }
                         return {
-                            ...event,
-                            id: event.id || `event-idx-${idx}`,
-                            start: startDate,
-                            end: endDate,
-                            allDay: event.allDay || false,
-                            desc: event.description || event.desc || '',
+                            id: event.id || `event-idx-${idx}`, title: event.title, start: startDate,
+                            end: endDate, allDay: event.allDay || false, 
+                            desc: event.description || event.desc || '', 
                         };
-                    }).filter(event => event !== null);
+                    }).filter(event => event !== null); 
                     setEvents(formattedEvents);
                 } else {
-                    console.warn('[DashboardPage] Calendar data not loaded or format mismatch (reverted version):', responseData);
-                    setEvents([]);
+                    console.warn('[DashboardPage] Calendar data not loaded or format mismatch:', responseData);
+                    setEvents([]); 
                 }
             } catch (error) {
-                console.error('[DashboardPage] Exception while loading calendar events (reverted version):', error);
-                if (error.authError) {
-                    alert('일정 로드 권한이 없습니다. 다시 로그인해주세요.');
-                    if(navigate) navigate('/login');
-                }
+                console.error('[DashboardPage] Exception while loading calendar events:', error);
+                if (error.authError) { alert('일정 로드 권한이 없습니다. 다시 로그인해주세요.'); if (navigate) navigate('/login'); }
                 setEvents([]);
-            } finally {
-                setIsLoadingEvents(false);
-            }
+            } finally { setIsLoadingEvents(false); }
         };
-
-        if (userId) { 
-            loadCalendarEvents();
-        } else {
-            setIsLoadingEvents(false); 
-            setEvents([]); 
-            console.log("[DashboardPage] No user_id found, skipping calendar event load (reverted version).");
-        }
+        if (userId) { loadCalendarEvents(); } 
+        else { setIsLoadingEvents(false); setEvents([]); console.log("[DashboardPage] No user_id found, skipping calendar event load."); }
     }, [userId, navigate]);
 
-    // 기타 데이터 로드 (Summary, SensorStatus, Workflow, ApiStatus)
+    // 대시보드 위젯 데이터 로드
     useEffect(() => {
-        const fetchAllDashboardData = async () => {
-            setIsLoading(true); // 전체 데이터 로딩 시작
+        const fetchDashboardWidgetsData = async () => {
             try {
-                const [summary, statuses, workflowsData, apis] = await Promise.all([
-                    getDashboardSummary(),
-                    getSensorStatuses(),
-                    getRecentWorkflowsForDashboard(), // 워크플로우 서비스 호출
-                    getApiStatusesForDashboard()
+                const [summary, statuses, apis] = await Promise.all([
+                    getDashboardSummary(), getSensorStatuses(), getApiStatusesForDashboard()
                 ]);
-                setSummaryData(summary);
-                setSensorStatuses(statuses);
-                // 워크플로우 데이터 처리
-                if (workflowsData && workflowsData.success && Array.isArray(workflowsData.workflows)) {
-                    setRecentWorkflows(workflowsData.workflows);
+                setSummaryData(summary); setSensorStatuses(statuses); setApiStatuses(apis);
+            } catch (error) { console.error("[DashboardPage] Error fetching dashboard widgets data:", error); }
+        };
+        fetchDashboardWidgetsData();
+    }, []);
+
+    // ★★★ 최근 워크플로우 데이터 로드 (상세 로그 포함) ★★★
+    const [recentWorkflows, setRecentWorkflows] = useState([]);
+    useEffect(() => {
+        const loadRecentWorkflows = async () => {
+            console.log("[DashboardPage] LoadRecentWorkflows: Attempting to load..."); // 1. 함수 시작 로그
+            setIsLoadingWorkflows(true); 
+            try {
+                const workflowsArray = await getRecentWorkflowsForDashboard(); 
+                console.log("[DashboardPage] LoadRecentWorkflows: Raw response from API:", JSON.stringify(workflowsArray, null, 2)); // 2. API 원본 데이터
+
+                if (Array.isArray(workflowsArray)) {
+                    console.log("[DashboardPage] LoadRecentWorkflows: Response is an array. Count:", workflowsArray.length); // 3. 배열 확인 및 개수
+                    console.log("[DashboardPage] LoadRecentWorkflows: Setting recentWorkflows state with (full array):", JSON.stringify(workflowsArray, null, 2)); // 4. 상태 설정 전 데이터
+                    setRecentWorkflows(workflowsArray);
                 } else {
-                    console.error('[DashboardPage] Failed to load recent workflows (reverted version):', workflowsData);
-                    setRecentWorkflows([]);
+                    console.error('[DashboardPage] LoadRecentWorkflows: Data is not an array or API call failed:', workflowsArray); // 5. 배열 아닐 시
+                    setRecentWorkflows([]); 
                 }
-                setApiStatuses(apis);
             } catch (error) {
-                console.error("Error fetching dashboard data (reverted version):", error);
-                // 개별적으로 실패할 수 있으므로, 각 state를 초기화할지 여부 결정
-                setSummaryData({ activeSensors: 0, dataCollected: "0", errorRate: "0%", apiCalls: "0" });
-                setSensorStatuses([]);
-                setRecentWorkflows([]);
-                setApiStatuses([]);
+                console.error('[DashboardPage] LoadRecentWorkflows: Exception caught:', error); // 6. 예외 발생 시
+                setRecentWorkflows([]); 
             } finally {
-                setIsLoading(false); // 전체 데이터 로딩 완료
+                setIsLoadingWorkflows(false); 
+                console.log("[DashboardPage] LoadRecentWorkflows: Finished. isLoadingWorkflows set to false."); // 7. 로딩 완료
             }
         };
-        fetchAllDashboardData();
+        loadRecentWorkflows();
     }, []);
-    
-    // Socket.IO (이전과 동일)
+
+    // Socket.IO 연결
     useEffect(() => {
         socketRef.current = io(SOCKET_SERVER_URL, { transports: ['websocket'] });
+        socketRef.current.on('connect_error', (err) => { console.error("Socket.IO connection error:", err.message); setIsConnected(false); });
         socketRef.current.on('connect', () => setIsConnected(true));
         socketRef.current.on('disconnect', () => setIsConnected(false));
         socketRef.current.on('newSensorData', (newData) => {
             setLiveSensorData(prevData => {
-                const enrichedData = { 
-                    ...newData, 
-                    time: new Date(newData.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) 
-                };
-                const updatedData = [...prevData, enrichedData];
-                return updatedData.slice(-MAX_DATA_POINTS_LINE_CHART);
+                const enrichedData = { ...newData, time: new Date(newData.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) };
+                return [...prevData, enrichedData].slice(-MAX_DATA_POINTS_LINE_CHART);
             });
         });
         return () => { if (socketRef.current) socketRef.current.disconnect(); };
     }, []);
 
-    // getIconComponentForSensor (이전과 동일)
     const getIconComponentForSensor = (sensorName = "") => {
         const lowerSensorName = sensorName.toLowerCase();
-        if (lowerSensorName.includes("온도") || lowerSensorName.includes("temperature")) return Thermometer;
-        if (lowerSensorName.includes("습도") || lowerSensorName.includes("humidity")) return Droplet;
-        if (lowerSensorName.includes("전류") || lowerSensorName.includes("current")) return Zap;
-        if (lowerSensorName.includes("압력") || lowerSensorName.includes("pressure")) return Wind;
-        if (lowerSensorName.includes("가스") || lowerSensorName.includes("gas")) return AlertTriangle;
+        if (lowerSensorName.includes("온도")) return Thermometer;
+        if (lowerSensorName.includes("습도")) return Droplet;
+        if (lowerSensorName.includes("전류")) return Zap;
+        if (lowerSensorName.includes("압력")) return Wind;
+        if (lowerSensorName.includes("가스")) return AlertTriangle;
         return Activity;
     };
 
-    // Calendar Event Handlers (이전과 동일, 날짜 파싱 부분은 loadCalendarEvents와 handleSaveEvent에서 주의)
     const [showEventModal, setShowEventModal] = useState(false);
     const [selectedEvent, setSelectedEvent] = useState(null);
     const [newEvent, setNewEvent] = useState({ title: '', start: null, end: null, desc: '' });
-    // dateRangeFilter는 현재 JSX에서 사용되지 않음
+    // const [dateRangeFilter, setDateRangeFilter] = useState('today'); // 현재 JSX에서 사용 X
 
     const handleSaveEvent = async () => {
         if (!userId) { if (navigate) navigate('/login'); return; }
-        if (!newEvent.title || !newEvent.start || !newEvent.end) {
-            alert('제목, 시작 시간, 종료 시간은 필수입니다.'); return;
-        }
+        if (!newEvent.title || !newEvent.start || !newEvent.end) { alert('제목, 시작 시간, 종료 시간은 필수입니다.'); return; }
         try {
             const eventDataPayload = {
-                title: newEvent.title,
-                start: newEvent.start.toISOString(), 
-                end: newEvent.end.toISOString(),     
-                description: newEvent.desc, // 백엔드 컨트롤러에서 desc 대신 description을 받을 수 있음
+                title: newEvent.title, start: newEvent.start.toISOString(), 
+                end: newEvent.end.toISOString(), description: newEvent.desc,
             };
             let response;
             if (selectedEvent && selectedEvent.id) {
@@ -256,71 +224,60 @@ function DashboardPage() {
                 response = await createCalendarEvent(eventDataPayload);
             }
             if (response && response.success && response.event) {
+                const parseDateTimeStringAsUTC = (dateTimeString) => {
+                    if (!dateTimeString || typeof dateTimeString !== 'string') return null;
+                    if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}$/.test(dateTimeString)) { return new Date(dateTimeString.replace(' ', 'T') + 'Z'); }
+                    const parsedDate = new Date(dateTimeString); return isNaN(parsedDate.getTime()) ? null : parsedDate;
+                };
                 const processedEvent = {
                     ...response.event,
-                    start: response.event.start ? new Date(response.event.start) : null, // 단순 new Date() 사용
-                    end: response.event.end ? new Date(response.event.end) : null      // 단순 new Date() 사용
+                    start: parseDateTimeStringAsUTC(response.event.start),
+                    end: parseDateTimeStringAsUTC(response.event.end)
                 };
-                 // 상태 업데이트 전 유효성 검사 추가
-                if (processedEvent.start && isNaN(processedEvent.start.getTime())) processedEvent.start = null;
-                if (processedEvent.end && isNaN(processedEvent.end.getTime())) processedEvent.end = null;
-
+                if (!processedEvent.start || !processedEvent.end) { // 파싱 실패 시 처리
+                    alert('저장된 이벤트의 날짜 형식이 올바르지 않아 목록에 추가할 수 없습니다.');
+                    setShowEventModal(false); setSelectedEvent(null); setNewEvent({ title: '', start: null, end: null, desc: '' });
+                    return;
+                }
                 if (selectedEvent && selectedEvent.id) {
                     setEvents(events.map(ev => ev.id === selectedEvent.id ? processedEvent : ev));
                 } else {
                     setEvents([...events, processedEvent]);
                 }
-                setShowEventModal(false);
-                setSelectedEvent(null);
-                setNewEvent({ title: '', start: null, end: null, desc: '' });
-            } else {
-                alert(response?.error || '일정 저장 실패');    
-            }
+                setShowEventModal(false); setSelectedEvent(null); setNewEvent({ title: '', start: null, end: null, desc: '' });
+            } else { alert(response?.error || '일정 저장 실패'); }
         } catch (error) {
-            console.error('[DashboardPage] Error saving event (reverted version):', error);
-            if (error.authError) { if (navigate) navigate('/login'); } 
-            else { alert(error.message || '일정 저장 중 오류'); }
+            console.error('[DashboardPage] Error saving event:', error);
+            if (error.authError) { if (navigate) navigate('/login'); } else { alert(error.message || '일정 저장 중 오류'); }
         }
     };
 
     const handleDeleteEvent = async (eventIdToDelete) => {
-        // (이전과 동일)
         if (!userId) { if (navigate) navigate('/login'); return; }
         if (!eventIdToDelete || !window.confirm('삭제하시겠습니까?')) return;
         try {
             const response = await deleteCalendarEvent(eventIdToDelete);
             if (response && response.success) {
                 setEvents(events.filter(event => event.id !== eventIdToDelete));
-                setShowEventModal(false); 
-                setSelectedEvent(null);  
-            } else {
-                 alert(response?.error || '일정 삭제 실패');    
-            }
+                setShowEventModal(false); setSelectedEvent(null);  
+            } else { alert(response?.error || '일정 삭제 실패'); }
         } catch (error) {
-            console.error('[DashboardPage] Error deleting event (reverted version):', error);
-            if (error.authError) { if (navigate) navigate('/login'); } 
-            else { alert(error.message || '일정 삭제 중 오류'); }
+            console.error('[DashboardPage] Error deleting event:', error);
+            if (error.authError) { if (navigate) navigate('/login'); } else { alert(error.message || '일정 삭제 중 오류'); }
         }
     };
 
     const handleSelectEvent = (event) => {
         setSelectedEvent(event);
-        setNewEvent({
-            title: event.title,
-            start: event.start, // 이미 Date 객체여야 함
-            end: event.end,     // 이미 Date 객체여야 함
-            desc: event.desc || event.description || ''
-        });
+        setNewEvent({ title: event.title, start: event.start, end: event.end, desc: event.desc || event.description || '' });
         setShowEventModal(true);
     };
 
     const handleSelectSlot = ({ start, end }) => { 
-        setSelectedEvent(null); 
-        setNewEvent({ title: '', start, end, desc: '' });
+        setSelectedEvent(null); setNewEvent({ title: '', start, end, desc: '' });
         setShowEventModal(true);
     };
 
-    // --- JSX 렌더링 부분 ---
     return (
         <div className="p-4 md:p-6 space-y-6 bg-gray-50 dark:bg-gray-900 min-h-screen">
             <div className="text-xs text-right text-gray-500 dark:text-gray-400"> 
@@ -422,6 +379,7 @@ function DashboardPage() {
                 </div>
             </div>
             
+            {/* ★★★ 최근 워크플로우 섹션 (상세 로그 포함) ★★★ */}
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4">
                 <div className="flex justify-between items-center mb-3">
                     <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-200">최근 워크플로우</h3>
@@ -430,18 +388,27 @@ function DashboardPage() {
                     </Link>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {isLoading ? ( // 이 isLoading은 워크플로우 섹션에 대한 로딩 상태
+                    {/* 7. isLoadingWorkflows 상태 확인 로그 (JSX용) */}
+                    {isLoadingWorkflows && console.log("[DashboardPage] Rendering Workflows JSX: isLoadingWorkflows is TRUE")}
+                    {!isLoadingWorkflows && recentWorkflows.length > 0 && console.log("[DashboardPage] Rendering Workflows JSX: Found workflows, count:", recentWorkflows.length)}
+                    {!isLoadingWorkflows && recentWorkflows.length === 0 && console.log("[DashboardPage] Rendering Workflows JSX: No workflows to display (length is 0, not loading).")}
+
+                    {isLoadingWorkflows ? ( 
                          <div className="col-span-full flex justify-center py-6">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
                         </div>
                     ) : recentWorkflows.length > 0 ? (
-                        recentWorkflows.slice(0, 3).map((workflow, idx) => (
-                            <WorkflowItem
-                                key={workflow.id || workflow.workflow_id || `workflow-${idx}`}
-                                name={workflow.name}
-                                time={workflow.updated_at ? new Date(workflow.updated_at).toLocaleDateString() : 'N/A'}
-                            />
-                        ))
+                        recentWorkflows.slice(0, 3).map((workflow, idx) => {
+                            // 8. map 함수 내부에서 각 workflow 객체 확인 로그
+                            console.log(`[DashboardPage] Rendering Workflows JSX: Mapping workflow item ${idx}:`, JSON.stringify(workflow, null, 2));
+                            return (
+                                <WorkflowItem
+                                    key={workflow.id || workflow.workflow_id || `workflow-${idx}`}
+                                    name={workflow.name}
+                                    time={workflow.updated_at ? new Date(workflow.updated_at).toLocaleDateString() : 'N/A'}
+                                />
+                            );
+                        })
                     ) : (
                         <div className="col-span-full text-center py-6 text-sm text-gray-500 dark:text-gray-400">
                             최근 워크플로우가 없습니다.
@@ -453,7 +420,7 @@ function DashboardPage() {
             {/* 이벤트 모달 */}
             {showEventModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-5 md:p-6 w-full max-w-md">
+                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-5 md:p-6 w-full max-w-md">
                         <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-5">
                             {selectedEvent ? '일정 수정' : '새 일정 추가'}
                         </h3>
