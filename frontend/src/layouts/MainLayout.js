@@ -21,6 +21,7 @@ import {
     LineChart // 데이터 분석 아이콘 추가
 } from 'lucide-react';
 import { getCurrentUserData, logout } from '../services/authService';
+import io from 'socket.io-client';
 
 const SidebarMenuItem = ({ path, icon, text, active = false, collapsed = false, submenu = [] }) => {
     const [isSubmenuOpen, setIsSubmenuOpen] = useState(false);
@@ -88,11 +89,15 @@ const SidebarMenuItem = ({ path, icon, text, active = false, collapsed = false, 
     );
 };
 
+const SOCKET_SERVER_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:3001';
+
 const MainLayout = () => {
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
     // const [notificationDropdownOpen, setNotificationDropdownOpen] = useState(false); // 필요시 사용
     const [isDarkMode, setIsDarkMode] = useState(document.documentElement.classList.contains('dark')); // 다크모드 상태 추가
+    const [isConnected, setIsConnected] = useState(false);
+    const [currentLocation, setCurrentLocation] = useState('위치 확인 중...');
 
     const navigate = useNavigate();
     const location = useLocation();
@@ -171,6 +176,37 @@ const MainLayout = () => {
         return false;
     };
 
+    // 소켓 연결 상태
+    useEffect(() => {
+        const socket = io(SOCKET_SERVER_URL, { transports: ['websocket'] });
+        socket.on('connect', () => setIsConnected(true));
+        socket.on('disconnect', () => setIsConnected(false));
+        socket.on('connect_error', () => setIsConnected(false));
+        return () => socket.disconnect();
+    }, []);
+
+    // 현재 위치 주소
+    useEffect(() => {
+        if (!navigator.geolocation) {
+            setCurrentLocation('위치 정보 사용 불가');
+            return;
+        }
+        navigator.geolocation.getCurrentPosition(
+            async (position) => {
+                const { latitude, longitude } = position.coords;
+                try {
+                    const res = await fetch(
+                        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`
+                    );
+                    const data = await res.json();
+                    setCurrentLocation(data.display_name || '주소 정보 없음');
+                } catch {
+                    setCurrentLocation('주소 변환 실패');
+                }
+            },
+            () => setCurrentLocation('위치 권한 필요')
+        );
+    }, []);
 
     return (
         <div className="flex h-screen bg-[#f8f6fc] dark:bg-[#211a2e] transition-colors duration-300">
@@ -210,9 +246,28 @@ const MainLayout = () => {
                     </ul>
                 </nav>
 
-                {/* 사용자 프로필 섹션은 헤더로 이동했으므로 여기서는 제거합니다. */}
-                {/* 필요하다면 사이드바 하단에 다른 내용을 추가할 수 있습니다. */}
-                {/* <div className="p-3 border-t border-[#b39ddb] dark:border-[#3a2e5a]"> ... </div> */}
+                {/* 사이드바 하단 정보 */}
+                <div className="p-4 border-t border-[#b39ddb] dark:border-[#3a2e5a] mt-auto">
+                    {sidebarCollapsed ? (
+                        // 접힘: 연결상태 점만
+                        <div className="flex items-center justify-center">
+                            <span className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                        </div>
+                    ) : (
+                        // 펼침: 연결상태(점+텍스트) + 현재 위치
+                        <div className="space-y-2">
+                            <div className="flex items-center text-sm">
+                                <span className={`w-2 h-2 rounded-full mr-2 ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                                <span className={isConnected ? 'text-green-600' : 'text-red-500'}>
+                                    {isConnected ? '연결됨' : '연결 끊김'}
+                                </span>
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-300 break-words">
+                                <span className="font-semibold">현재 위치:</span> {currentLocation}
+                            </div>
+                        </div>
+                    )}
+                </div>
             </aside>
 
             {/* 메인 콘텐츠 */}

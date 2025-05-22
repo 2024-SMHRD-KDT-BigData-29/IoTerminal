@@ -25,27 +25,22 @@ const SOCKET_SERVER_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:
 const MAX_DATA_POINTS_LINE_CHART = 20;
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
 
-const SummaryCard = ({ title, value, icon: Icon, trend, trendValue }) => (
-    <div className="bg-white dark:bg-[#3a2e5a] p-6 rounded-xl shadow-sm">
-        <div className="flex items-center justify-between">
-            <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{title}</p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white mt-1">{value}</p>
-            </div>
-            <div className="h-12 w-12 rounded-full bg-violet-100 dark:bg-[#9575cd] flex items-center justify-center">
-                <Icon className="h-6 w-6 text-violet-600 dark:text-violet-200" />
+const SummaryCard = ({ title, value, change, up, icon }) => {
+    return (
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300">
+            <div className="flex items-center">
+                {icon && <div className="p-3 bg-purple-100 dark:bg-purple-500/20 rounded-lg mr-4">{icon}</div>}
+                <div>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{title}</p>
+                    <p className="text-2xl font-bold text-gray-800 dark:text-white">{value}</p>
+                    {change && (
+                        <p className={`text-xs font-medium ${up ? 'text-green-500 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>{change}</p>
+                    )}
+                </div>
             </div>
         </div>
-        {trend && (
-            <div className="mt-4 flex items-center">
-                <span className={`text-sm ${trend === 'up' ? 'text-green-500' : 'text-red-500'}`}>
-                    {trend === 'up' ? '↑' : '↓'} {trendValue}
-                </span>
-                <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">vs last period</span>
-            </div>
-        )}
-    </div>
-);
+    );
+};
 
 const SensorStatusItem = ({ name, value, unit, status, icon: Icon }) => (
     <div className="bg-white dark:bg-[#3a2e5a] p-4 rounded-xl shadow-sm">
@@ -92,114 +87,68 @@ const WorkflowItem = ({ name, status, lastRun }) => (
     </div>
 );
 
-// 날씨 카드 컴포넌트
+// WeatherCard 컴포넌트 (SummaryCard와 어울리는 디자인)
 const WeatherCard = () => {
     const [weather, setWeather] = useState(null);
-    const [locationError, setLocationError] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [locationError, setLocationError] = useState(null);
 
     useEffect(() => {
         const getWeather = async (latitude, longitude) => {
             try {
                 const response = await fetch(
-                    `${API_URL}/weather/current?lat=${latitude}&lon=${longitude}`
+                    `${process.env.REACT_APP_API_URL || 'http://localhost:3001/api'}/weather/current?lat=${latitude}&lon=${longitude}`
                 );
                 const result = await response.json();
-                if (!result.success) {
-                    throw new Error(result.message || '날씨 정보를 가져오는데 실패했습니다.');
-                }
+                if (!result.success) throw new Error(result.message || '날씨 정보를 가져오는데 실패했습니다.');
                 setWeather(result.data);
             } catch (error) {
-                setLocationError(`날씨 정보를 불러올 수 없습니다: ${error.message}`);
+                setLocationError(error.message);
             } finally {
                 setLoading(false);
             }
         };
-
         if (!navigator.geolocation) {
             setLocationError('위치 정보 사용 불가');
             setLoading(false);
             return;
         }
-
         navigator.geolocation.getCurrentPosition(
             (position) => {
                 const { latitude, longitude } = position.coords;
                 getWeather(latitude, longitude);
             },
-            (error) => {
+            () => {
                 setLocationError('위치 권한이 필요합니다.');
                 setLoading(false);
             }
         );
     }, []);
 
-    // 날씨 아이콘 URL 생성
-    const getWeatherIconUrl = (iconCode) => {
-        return `https://openweathermap.org/img/wn/${iconCode}@2x.png`;
-    };
-
     if (loading) {
-        return (
-            <div className="bg-white dark:bg-[#3a2e5a] p-6 rounded-xl shadow-sm">
-                <h3 className="text-sm text-gray-500 dark:text-gray-400 mb-1">현재 날씨</h3>
-                <div className="flex items-center justify-center h-16">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-500"></div>
-                </div>
-            </div>
-        );
+        return <div className="flex items-center justify-center h-full min-h-[60px]">날씨 정보를 불러오는 중...</div>;
     }
-
     if (locationError) {
-        return (
-            <div className="bg-white dark:bg-[#3a2e5a] p-6 rounded-xl shadow-sm">
-                <h3 className="text-sm text-gray-500 dark:text-gray-400 mb-1">현재 날씨</h3>
-                <div className="flex items-center">
-                    <p className="text-2xl font-semibold text-red-500 dark:text-red-400">{locationError}</p>
-                </div>
-            </div>
-        );
+        return <div className="text-red-500 text-sm h-full min-h-[60px] flex items-center justify-center">{locationError}</div>;
     }
-
     if (!weather) {
-        return (
-            <div className="bg-white dark:bg-[#3a2e5a] p-6 rounded-xl shadow-sm">
-                <h3 className="text-sm text-gray-500 dark:text-gray-400 mb-1">현재 날씨</h3>
-                <div className="flex items-center">
-                    <p className="text-2xl font-semibold text-gray-900 dark:text-white">날씨 정보가 없습니다</p>
-                </div>
-            </div>
-        );
+        return <div className="text-gray-400 text-sm h-full min-h-[60px] flex items-center justify-center">날씨 정보가 없습니다</div>;
     }
-
     return (
-        <div className="bg-white dark:bg-[#3a2e5a] p-6 rounded-xl shadow-sm">
-            <h3 className="text-sm text-gray-500 dark:text-gray-400 mb-1">현재 날씨</h3>
-            <div className="flex items-center justify-between">
-                <div>
-                    <p className="text-2xl font-semibold text-blue-700 dark:text-blue-200">
-                        {Math.round(weather.temperature)}°C
-                    </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {weather.city}
-                    </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {weather.description}
-                    </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                        습도: {weather.humidity}%
-                    </p>
-                </div>
-                <div className="flex flex-col items-center">
-                    <img 
-                        src={getWeatherIconUrl(weather.icon)} 
-                        alt={weather.description}
-                        className="w-16 h-16"
-                    />
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                        풍속: {weather.windSpeed} m/s
-                    </p>
-                </div>
+        <div className="flex items-center justify-between h-full min-h-[60px]">
+            <div>
+                <p className="text-2xl font-bold text-blue-700 dark:text-blue-200">{Math.round(weather.temperature)}°C</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{weather.city}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{weather.description}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">습도: {weather.humidity}%</p>
+            </div>
+            <div className="flex flex-col items-center">
+                <img
+                    src={`https://openweathermap.org/img/wn/${weather.icon}@2x.png`}
+                    alt={weather.description}
+                    className="w-12 h-12"
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">풍속: {weather.windSpeed} m/s</p>
             </div>
         </div>
     );
@@ -408,40 +357,39 @@ function DashboardPage() {
     };
 
     return (
-        <div className="p-4 md:p-6 space-y-6 bg-gray-50 dark:bg-gray-900 min-h-screen">
-            <div className="text-xs text-right text-gray-500 dark:text-gray-400"> 
-                Socket Status: {isConnected ? 
-                    <span className="text-green-500 font-semibold">Connected</span> : 
-                    <span className="text-red-500 font-semibold">Disconnected</span>}
-            </div>
-
+        <div className="p-3 md:p-4 space-y-3 bg-gray-50 dark:bg-gray-900 min-h-screen">
+            {/* 상단 요약 카드 섹션 */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <SummaryCard title="활성 센서" value={summaryData.activeSensors} change="+2" up={true} icon={Activity} />
-                <SummaryCard title="수집 데이터 (오늘)" value={summaryData.dataCollected} change="+12%" up={true} icon={Database} />
-                <SummaryCard title="오류율" value={summaryData.errorRate} change="-0.6%" up={false} icon={Shield} />
-                <WeatherCard />
+                <SummaryCard title="활성 센서" value={summaryData.activeSensors} change="+2" up={true} icon={<Activity size={20} className="text-blue-500" />} />
+                <SummaryCard title="수집 데이터 (오늘)" value={summaryData.dataCollected} change="+12%" up={true} icon={<Database size={20} className="text-green-500" />} />
+                <SummaryCard title="오류율" value={summaryData.errorRate} change="-0.6%" up={false} icon={<Shield size={20} className="text-red-500" />} />
+                <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-lg flex flex-col justify-between">
+                    <WeatherCard />
+                </div>
             </div>
             
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 lg:col-span-2">
-                    <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-4">실시간 데이터 스트림</h3>
-                    <div className="h-[350px] md:h-[400px]">
+            {/* 메인 콘텐츠 섹션 */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+                {/* 실시간 데이터 스트림 */}
+                <div className="lg:col-span-7 bg-white dark:bg-gray-800 rounded-xl shadow p-3 flex flex-col">
+                    <h3 className="text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">실시간 데이터 스트림</h3>
+                    <div className="flex-1 min-h-[160px]">
                         {liveSensorData.length > 0 ? (
                             <ResponsiveContainer width="100%" height="100%">
-                                 <LineChart data={liveSensorData}>
+                                <LineChart data={liveSensorData}>
                                     <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.3} className="dark:stroke-gray-600 stroke-gray-300" />
-                                    <XAxis dataKey="time" tick={{fontSize: 11, fill: '#6b7280'}} className="dark:fill-gray-400" />
-                                    <YAxis yAxisId="left" orientation="left" stroke="#8884d8" tick={{fontSize: 11, fill: '#6b7280'}} className="dark:fill-gray-400" />
-                                    <YAxis yAxisId="right" orientation="right" stroke="#82ca9d" tick={{fontSize: 11, fill: '#6b7280'}} className="dark:fill-gray-400" />
+                                    <XAxis dataKey="time" tick={{fontSize: 10, fill: '#6b7280'}} className="dark:fill-gray-400" />
+                                    <YAxis yAxisId="left" orientation="left" stroke="#8884d8" tick={{fontSize: 10, fill: '#6b7280'}} className="dark:fill-gray-400" />
+                                    <YAxis yAxisId="right" orientation="right" stroke="#82ca9d" tick={{fontSize: 10, fill: '#6b7280'}} className="dark:fill-gray-400" />
                                     <Tooltip 
-                                        contentStyle={{ backgroundColor: 'rgba(255,255,255,0.9)', fontSize: '12px', borderRadius: '8px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}
+                                        contentStyle={{ backgroundColor: 'rgba(255,255,255,0.9)', fontSize: '11px', borderRadius: '8px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}
                                         itemStyle={{ color: '#333' }}
                                     />
-                                    <Legend wrapperStyle={{fontSize: '12px', paddingTop: '10px'}} />
-                                    <Line yAxisId="left" type="monotone" dataKey="temperature" stroke="#8884d8" strokeWidth={2} activeDot={{ r: 5 }} name="온도 (°C)" dot={false} />
-                                    <Line yAxisId="right" type="monotone" dataKey="humidity" stroke="#82ca9d" strokeWidth={2} activeDot={{ r: 5 }} name="습도 (%)" dot={false} />
+                                    <Legend wrapperStyle={{fontSize: '11px', paddingTop: '6px'}} />
+                                    <Line yAxisId="left" type="monotone" dataKey="temperature" stroke="#8884d8" strokeWidth={2} activeDot={{ r: 4 }} name="온도 (°C)" dot={false} />
+                                    <Line yAxisId="right" type="monotone" dataKey="humidity" stroke="#82ca9d" strokeWidth={2} activeDot={{ r: 4 }} name="습도 (%)" dot={false} />
                                     {liveSensorData[0]?.pressure !== undefined && 
-                                        <Line yAxisId="left" type="monotone" dataKey="pressure" stroke="#ffc658" strokeWidth={2} activeDot={{ r: 5 }} name="압력 (hPa)" dot={false} />
+                                        <Line yAxisId="left" type="monotone" dataKey="pressure" stroke="#ffc658" strokeWidth={2} activeDot={{ r: 4 }} name="압력 (hPa)" dot={false} />
                                     }
                                 </LineChart>
                             </ResponsiveContainer>
@@ -452,74 +400,78 @@ function DashboardPage() {
                         )}
                     </div>
                 </div>
-                
-                <div className="space-y-6">
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4">
-                        <div className="flex justify-between items-center mb-3">
-                            <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-200">디바이스 상태</h3>
+
+                {/* 우측 사이드바 */}
+                <div className="lg:col-span-5 space-y-3 flex flex-col">
+                    {/* 디바이스 상태 */}
+                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-3 flex-1 min-h-[80px]">
+                        <div className="flex justify-between items-center mb-2">
+                            <h3 className="text-base font-semibold text-gray-700 dark:text-gray-200">디바이스 상태</h3>
                             <Link to="/iot-devices" className="text-xs font-medium text-purple-600 dark:text-purple-400 hover:underline">전체 보기</Link>
                         </div>
-                        <div className="space-y-2 max-h-[150px] overflow-y-auto custom-scrollbar pr-1">
+                        <div className="space-y-1 max-h-[60px] overflow-y-auto custom-scrollbar pr-1">
                             {sensorStatuses.length > 0 ? sensorStatuses.map((sensor, idx) => (
                                 <SensorStatusItem 
-                                  key={sensor.id || `sensor-${idx}`}
-                                  name={sensor.name}
-                                  status={sensor.status}
-                                  value={sensor.value}
-                                  icon={getIconComponentForSensor(sensor.name)}
+                                    key={sensor.id || `sensor-${idx}`}
+                                    name={sensor.name}
+                                    status={sensor.status}
+                                    value={sensor.value}
+                                    icon={getIconComponentForSensor(sensor.name)}
                                 />
                             )) : (
-                                <div className="text-xs text-gray-500 dark:text-gray-400 py-3 text-center bg-gray-50 dark:bg-gray-700/30 rounded-lg">
+                                <div className="text-xs text-gray-500 dark:text-gray-400 py-2 text-center bg-gray-50 dark:bg-gray-700/30 rounded-lg">
                                     등록된 디바이스가 없습니다
                                 </div>
                             )}
                         </div>
                     </div>
 
+                    {/* 일정 관리 */}
                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4">
                         <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-3">일정 관리</h3>
-                        <div className="h-[280px] md:h-[300px] text-sm">
+                        <div className="text-sm">
                             {isLoadingEvents ? (
                                 <div className="h-full flex items-center justify-center">
                                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
                                 </div>
                             ) : (
-                                <Calendar
-                                    localizer={localizer}
-                                    events={events}
-                                    startAccessor="start"
-                                    endAccessor="end"
-                                    style={{ height: '100%' }}
-                                    onSelectSlot={handleSelectSlot}
-                                    onSelectEvent={handleSelectEvent}
-                                    selectable
-                                    views={['month', 'week', 'day']}
-                                    messages={{
-                                        next: "다음", previous: "이전", today: "오늘",
-                                        month: "월", week: "주", day: "일", agenda: "일정 목록",
-                                        date: "날짜", time: "시간", event: "일정 내용",
-                                        noEventsInRange: "해당 범위에 일정이 없습니다.",
-                                    }}
-                                    className="rbc-calendar dark:text-gray-300"
-                                />
+                                <div style={{ height: 360 }}>
+                                    <Calendar
+                                        localizer={localizer}
+                                        events={events}
+                                        startAccessor="start"
+                                        endAccessor="end"
+                                        onSelectSlot={handleSelectSlot}
+                                        onSelectEvent={handleSelectEvent}
+                                        selectable
+                                        views={['month', 'week', 'day']}
+                                        messages={{
+                                            next: "다음", previous: "이전", today: "오늘",
+                                            month: "월", week: "주", day: "일", agenda: "일정 목록",
+                                            date: "날짜", time: "시간", event: "일정 내용",
+                                            noEventsInRange: "해당 범위에 일정이 없습니다.",
+                                        }}
+                                        className="rbc-calendar dark:text-gray-300"
+                                    />
+                                </div>
                             )}
                         </div>
                     </div>
                 </div>
             </div>
-            
-            {/* ★★★ 최근 워크플로우 섹션 (상세 로그 포함) ★★★ */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4">
-                <div className="flex justify-between items-center mb-3">
-                    <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-200">최근 워크플로우</h3>
+
+            {/* 최근 워크플로우 섹션 */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-3 mt-4">
+                <div className="flex justify-between items-center mb-2">
+                    <h3 className="text-base font-semibold text-gray-700 dark:text-gray-200">최근 워크플로우</h3>
                     <Link to="/workflow" className="text-xs font-medium text-purple-600 dark:text-purple-400 hover:underline">
                         전체 보기 및 새로 만들기
                     </Link>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                     {isLoadingWorkflows ? ( 
-                         <div className="col-span-full flex justify-center py-6">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+                        <div className="col-span-full flex justify-center py-4">
+                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-500"></div>
                         </div>
                     ) : recentWorkflows && recentWorkflows.length > 0 ? (
                         recentWorkflows.map((workflow, idx) => (
@@ -536,7 +488,7 @@ function DashboardPage() {
                             </Link>
                         ))
                     ) : (
-                        <div className="col-span-full text-center py-6 text-sm text-gray-500 dark:text-gray-400">
+                        <div className="col-span-full text-center py-4 text-xs text-gray-500 dark:text-gray-400">
                             최근 워크플로우가 없습니다.
                         </div>
                     )}
@@ -546,7 +498,7 @@ function DashboardPage() {
             {/* 이벤트 모달 */}
             {showEventModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-5 md:p-6 w-full max-w-md">
+                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-5 md:p-6 w-full max-w-md">
                         <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-5">
                             {selectedEvent ? '일정 수정' : '새 일정 추가'}
                         </h3>
