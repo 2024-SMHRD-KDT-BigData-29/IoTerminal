@@ -1,5 +1,5 @@
 // API 서버 URL 설정
-export const API_URL = 'http://localhost:3001/api';
+export const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
 
 // 기타 설정값들
 export const APP_CONFIG = {

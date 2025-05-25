@@ -134,7 +134,7 @@ const MainLayout = () => {
                 { path: '/iot/devices/analysis', text: '데이터 분석' }
             ]
         },
-        { path: '/settings', icon: <Settings size={20} />, text: '설정' },
+        { path: '/settings', icon: <Settings size={20} />, text: '설정' }
     ];
 
     const getPageTitle = () => {
