@@ -70,7 +70,11 @@ exports.getUserWorkflows = async (req, res) => {
     }
     try {
         const query = 'SELECT workflow_id, name, description, created_at, updated_at, is_public, user_id FROM workflows WHERE user_id = ? ORDER BY updated_at DESC LIMIT 10';
+
         const [workflows] = await pool.execute(query, [userId]);
+        console.log('조회된 워크플로우 수:', workflows.length);
+        console.log('조회된 워크플로우 목록:', workflows);
+        
         res.json({
             success: true,
             workflows: workflows || []
@@ -275,7 +279,7 @@ exports.getRecentWorkflows = async (req, res) => {
         }
 
         const [workflows] = await pool.execute(
-            'SELECT workflow_id, name, description, created_at, updated_at, is_public, user_id FROM workflows WHERE user_id = ? OR is_public = true ORDER BY updated_at DESC LIMIT 3',
+            'SELECT workflow_id, name, description, created_at, updated_at, is_public, user_id, status FROM workflows WHERE user_id = ? ORDER BY updated_at DESC LIMIT 3',
             [userId]
         );
 

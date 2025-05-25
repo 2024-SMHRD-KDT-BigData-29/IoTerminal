@@ -17,20 +17,9 @@ const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
  */
 export const login = async (userId, password, keepLoggedIn = false) => {
     try {
-        const response = await fetch(`${API_URL}/auth/login`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ userId, password })
-        });
-
-        const data = await response.json();
+        const response = await axios.post(`${API_URL}/auth/login`, { userId, password });
         
-        if (!response.ok) {
-            throw new Error(data.message || data.error || '로그인에 실패했습니다.');
-        }
-
+        const data = response.data;
         const storage = keepLoggedIn ? localStorage : sessionStorage;
         storage.setItem('user', JSON.stringify(data.user));
         storage.setItem('token', data.token);
@@ -38,7 +27,7 @@ export const login = async (userId, password, keepLoggedIn = false) => {
         return data;
     } catch (error) {
         console.error('로그인 오류:', error);
-        throw error;
+        throw error.response?.data || error;
     }
 };
 
@@ -50,36 +39,18 @@ export const login = async (userId, password, keepLoggedIn = false) => {
  */
 export const register = async (userData) => {
     try {
-        const response = await fetch(`${API_URL}/auth/register`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify({
-                userId: userData.userId,
-                password: userData.password,
-                name: userData.name,
-                email: userData.email,
-                phone: userData.phone || null
-            })
+        const response = await axios.post(`${API_URL}/auth/register`, {
+            userId: userData.userId,
+            password: userData.password,
+            name: userData.name,
+            email: userData.email,
+            phone: userData.phone || null
         });
 
-        const contentType = response.headers.get('content-type');
-        if (!response.ok) {
-            const errorData = contentType?.includes('application/json') ? await response.json() : null;
-            throw new Error(errorData?.message || errorData?.error || `회원가입 실패: ${response.statusText}`);
-        }
-
-        if (!contentType?.includes('application/json')) {
-            console.warn('서버 응답이 JSON 형식이 아닙니다.');
-            return { success: true, message: "회원가입이 완료되었습니다." };
-        }
-
-        return await response.json();
+        return response.data;
     } catch (error) {
         console.error('회원가입 오류:', error);
-        throw error;
+        throw error.response?.data || error;
     }
 };
 

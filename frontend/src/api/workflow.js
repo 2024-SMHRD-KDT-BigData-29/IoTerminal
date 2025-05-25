@@ -38,6 +38,7 @@ export const getWorkflowList = async () => {
       throw new Error('인증 토큰이 없습니다. 다시 로그인해주세요.');
     }
 
+    console.log('전체 워크플로우 목록 조회 시도...');
     const response = await fetch(`${API_URL}/workflow/list`, {
       headers: {
         'Authorization': `Bearer ${token}`
@@ -45,6 +46,7 @@ export const getWorkflowList = async () => {
     });
 
     const data = await response.json();
+    console.log('전체 워크플로우 목록 응답:', data);
     
     if (!response.ok) {
       if (response.status === 401 || response.status === 403) {
@@ -126,7 +128,7 @@ export const getRecentWorkflows = async () => {
     }
 
     console.log('최근 워크플로우 조회 시도...');
-    const response = await fetch(`${API_URL}/workflow/list`, {
+    const response = await fetch(`${API_URL}/workflow/recent`, {
       headers: {
         'Authorization': `Bearer ${token}`
       }

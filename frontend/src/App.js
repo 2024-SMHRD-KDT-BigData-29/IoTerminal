@@ -35,9 +35,12 @@ function App() {
                     <Route path="/workflow/name/:workflowName" element={<WorkflowPage />} />
                     <Route path="/workflow/new" element={<WorkflowCanvasPage />} />
                     <Route path="/workflow/edit/:workflowId" element={<WorkflowCanvasPage />} />
-                    <Route path="/iot/devices" element={<IotDevicesPage />} />
+                    
+                    {/* IoT 디바이스 관련 라우트 */}
+                    <Route path="/iot/devices" element={<Navigate to="/iot/devices/management" replace />} />
                     <Route path="/iot/devices/management" element={<IotDevicesPage />} />
                     <Route path="/iot/devices/analysis" element={<DataAnalysisPage />} />
+                    
                     <Route path="/settings" element={<SettingsPage />} />
                 </Route>
 

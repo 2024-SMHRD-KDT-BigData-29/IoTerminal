@@ -14,9 +14,11 @@ import { Calendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
 import 'moment/locale/ko';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
+import '../styles/Calendar.css';
 import { getCalendarEvents, createCalendarEvent, updateCalendarEvent, deleteCalendarEvent } from '../services/calendarService';
 import { getCurrentUserData } from '../services/authService';
-import { getRecentWorkflows } from '../api/workflow';
+import { getWorkflowList } from '../api/workflow';
+import { getUserDevices } from '../services/deviceService';
 
 moment.locale('ko');
 const localizer = momentLocalizer(moment);
@@ -161,8 +163,9 @@ function DashboardPage() {
 
     const [summaryData, setSummaryData] = useState({ activeSensors: 0, dataCollected: "0", errorRate: "0%", apiCalls: "0" });
     const [sensorStatuses, setSensorStatuses] = useState([]);
+    const [isLoadingSensors, setIsLoadingSensors] = useState(true);
     const [apiStatuses, setApiStatuses] = useState([]);
-    const [isLoadingWorkflows, setIsLoadingWorkflows] = useState(true); // 워크플로우 전용 로딩 상태
+    const [isLoadingWorkflows, setIsLoadingWorkflows] = useState(true);
     const navigate = useNavigate();
 
     const [events, setEvents] = useState([]);
@@ -194,8 +197,11 @@ function DashboardPage() {
                             return null;
                         }
                         return {
-                            id: event.id || `event-idx-${idx}`, title: event.title, start: startDate,
-                            end: endDate, allDay: event.allDay || false, 
+                            id: event.id || `event-idx-${idx}`, 
+                            title: event.title, 
+                            start: startDate,
+                            end: endDate, 
+                            allDay: event.allDay || false, 
                             desc: event.description || event.desc || '', 
                         };
                     }).filter(event => event !== null); 
@@ -206,12 +212,25 @@ function DashboardPage() {
                 }
             } catch (error) {
                 console.error('[DashboardPage] Exception while loading calendar events:', error);
-                if (error.authError) { alert('일정 로드 권한이 없습니다. 다시 로그인해주세요.'); if (navigate) navigate('/login'); }
-                setEvents([]);
-            } finally { setIsLoadingEvents(false); }
+                if (error.authError) {
+                    alert(error.message || '일정 로드 권한이 없습니다. 다시 로그인해주세요.');
+                    if (navigate) navigate('/login');
+                } else {
+                    alert(error.message || '일정 로드 중 오류가 발생했습니다.');
+                    setEvents([]);
+                }
+            } finally {
+                setIsLoadingEvents(false);
+            }
         };
-        if (userId) { loadCalendarEvents(); } 
-        else { setIsLoadingEvents(false); setEvents([]); console.log("[DashboardPage] No user_id found, skipping calendar event load."); }
+        
+        if (userId) {
+            loadCalendarEvents();
+        } else {
+            setIsLoadingEvents(false);
+            setEvents([]);
+            console.log("[DashboardPage] No user_id found, skipping calendar event load.");
+        }
     }, [userId, navigate]);
 
     // 대시보드 위젯 데이터 로드
@@ -233,28 +252,26 @@ function DashboardPage() {
         const loadRecentWorkflows = async () => {
             setIsLoadingWorkflows(true);
             try {
-                const response = await getRecentWorkflows();
-                let workflows = [];
-                if (response && Array.isArray(response.workflows)) {
-                    workflows = response.workflows;
-                } else if (Array.isArray(response)) {
-                    workflows = response;
+                const response = await getWorkflowList();
+                if (response && response.success && Array.isArray(response.workflows)) {
+                    // 최근 3개의 워크플로우만 필터링
+                    const sortedWorkflows = response.workflows
+                        .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+                        .slice(0, 3);
+                    setRecentWorkflows(sortedWorkflows);
+                } else {
+                    setRecentWorkflows([]);
                 }
-                // 내 워크플로우만 필터링
-                const myWorkflows = workflows.filter(
-                    w => w.userId === userId || w.user_id === userId
-                );
-                // 최신순 정렬 (lastRun, updatedAt, createdAt 중 하나)
-                myWorkflows.sort((a, b) => new Date(b.lastRun || b.updatedAt || b.createdAt) - new Date(a.lastRun || a.updatedAt || a.createdAt));
-                // 상위 3개만
-                setRecentWorkflows(myWorkflows.slice(0, 3));
             } catch (error) {
+                console.error('최근 워크플로우 로드 실패:', error);
                 setRecentWorkflows([]);
             } finally {
                 setIsLoadingWorkflows(false);
             }
         };
-        loadRecentWorkflows();
+        if (userId) {
+            loadRecentWorkflows();
+        }
     }, [userId]);
 
     // Socket.IO 연결
@@ -356,6 +373,32 @@ function DashboardPage() {
         setShowEventModal(true);
     };
 
+    // 디바이스 상태 로드
+    useEffect(() => {
+        const loadDeviceStatuses = async () => {
+            try {
+                setIsLoadingSensors(true);
+                const devices = await getUserDevices();
+                // 최대 3개의 디바이스만 표시
+                const recentDevices = devices.slice(0, 3);
+                setSensorStatuses(recentDevices.map(device => ({
+                    id: device.device_id,
+                    name: device.name,
+                    value: device.status?.value || '--',
+                    unit: device.unit || '',
+                    status: device.status?.condition || 'normal'
+                })));
+            } catch (error) {
+                console.error('디바이스 상태 로드 실패:', error);
+                setSensorStatuses([]);
+            } finally {
+                setIsLoadingSensors(false);
+            }
+        };
+
+        loadDeviceStatuses();
+    }, []);
+
     return (
         <div className="p-3 md:p-4 space-y-3 bg-gray-50 dark:bg-gray-900 min-h-screen">
             {/* 상단 요약 카드 섹션 */}
@@ -407,19 +450,26 @@ function DashboardPage() {
                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-3 flex-1 min-h-[80px]">
                         <div className="flex justify-between items-center mb-2">
                             <h3 className="text-base font-semibold text-gray-700 dark:text-gray-200">디바이스 상태</h3>
-                            <Link to="/iot-devices" className="text-xs font-medium text-purple-600 dark:text-purple-400 hover:underline">전체 보기</Link>
+                            <Link to="/iot/devices" className="text-xs font-medium text-purple-600 dark:text-purple-400 hover:underline">전체 보기</Link>
                         </div>
-                        <div className="space-y-1 max-h-[60px] overflow-y-auto custom-scrollbar pr-1">
-                            {sensorStatuses.length > 0 ? sensorStatuses.map((sensor, idx) => (
-                                <SensorStatusItem 
-                                    key={sensor.id || `sensor-${idx}`}
-                                    name={sensor.name}
-                                    status={sensor.status}
-                                    value={sensor.value}
-                                    icon={getIconComponentForSensor(sensor.name)}
-                                />
-                            )) : (
-                                <div className="text-xs text-gray-500 dark:text-gray-400 py-2 text-center bg-gray-50 dark:bg-gray-700/30 rounded-lg">
+                        <div className="space-y-2">
+                            {isLoadingSensors ? (
+                                <div className="flex justify-center items-center py-4">
+                                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-500"></div>
+                                </div>
+                            ) : sensorStatuses.length > 0 ? (
+                                sensorStatuses.map((sensor) => (
+                                    <SensorStatusItem 
+                                        key={sensor.id}
+                                        name={sensor.name}
+                                        value={sensor.value}
+                                        unit={sensor.unit}
+                                        status={sensor.status}
+                                        icon={getIconComponentForSensor(sensor.name)}
+                                    />
+                                ))
+                            ) : (
+                                <div className="text-center py-4 text-sm text-gray-500 dark:text-gray-400">
                                     등록된 디바이스가 없습니다
                                 </div>
                             )}
@@ -445,13 +495,23 @@ function DashboardPage() {
                                         onSelectEvent={handleSelectEvent}
                                         selectable
                                         views={['month', 'week', 'day']}
+                                        defaultView="month"
+                                        onNavigate={(date, view, action) => {
+                                            console.log('Calendar navigation:', { date, view, action });
+                                        }}
                                         messages={{
                                             next: "다음", previous: "이전", today: "오늘",
-                                            month: "월", week: "주", day: "일", agenda: "일정 목록",
+                                            month: "월", week: "주", day: "일",
+                                            agenda: "일정 목록",
                                             date: "날짜", time: "시간", event: "일정 내용",
                                             noEventsInRange: "해당 범위에 일정이 없습니다.",
                                         }}
                                         className="rbc-calendar dark:text-gray-300"
+                                        style={{
+                                            height: '100%',
+                                            width: '100%',
+                                            backgroundColor: 'transparent'
+                                        }}
                                     />
                                 </div>
                             )}

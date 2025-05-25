@@ -30,9 +30,16 @@ function WorkflowPage() {
 
     const fetchWorkflows = useCallback(async () => {
         try {
-            const response = await getWorkflowList();
-            if (response.success) {
+            console.log('워크플로우 목록 조회 시작');
+            const response = await getWorkflowList();  // getRecentWorkflows에서 getWorkflowList로 변경
+            console.log('워크플로우 목록 응답:', response);
+            
+            if (response && response.success && Array.isArray(response.workflows)) {
+                console.log('설정할 워크플로우 목록:', response.workflows);
                 setWorkflows(response.workflows);
+            } else {
+                console.error('워크플로우 목록 형식이 잘못됨:', response);
+                setWorkflows([]);
             }
         } catch (error) {
             console.error('워크플로우 목록 조회 실패:', error);
@@ -42,12 +49,15 @@ function WorkflowPage() {
             } else {
                 alert('워크플로우 목록을 불러오는데 실패했습니다.');
             }
+            setWorkflows([]);
         }
     }, [navigate]);
 
     useEffect(() => {
-        fetchWorkflows();
-    }, [fetchWorkflows]);
+        if (userId) {
+            fetchWorkflows();
+        }
+    }, [userId, fetchWorkflows]);
 
     // 워크플로우 로드 또는 새 워크플로우 초기화
     useEffect(() => {
@@ -254,7 +264,7 @@ function WorkflowPage() {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {workflows.length > 0 ? (
                         workflows.map((workflow) => (
                             <div key={workflow.workflow_id} className="bg-white dark:bg-[#3a2e5a] rounded-xl shadow-lg p-6">

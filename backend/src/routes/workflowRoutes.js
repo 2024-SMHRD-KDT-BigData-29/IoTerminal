@@ -37,11 +37,11 @@ const authenticateToken = (req, res, next) => {
     }
 };
 
-// 모든 워크플로우 라우트에 인증 미들웨어 적용
+// 모든 라우트에 인증 미들웨어 적용
 router.use(authenticateToken);
 
 // 워크플로우 라우트
-router.post('/save', createWorkflow);
+router.post('/', createWorkflow);
 router.get('/list', getUserWorkflows);
 router.get('/recent', getRecentWorkflows);
 router.get('/:workflowId', getWorkflowById);
