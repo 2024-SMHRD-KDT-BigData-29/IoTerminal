@@ -69,7 +69,7 @@ exports.getUserWorkflows = async (req, res) => {
         });
     }
     try {
-        const query = 'SELECT workflow_id, name, description, created_at, updated_at, is_public, user_id FROM workflows WHERE user_id = ? ORDER BY updated_at DESC LIMIT 3';
+        const query = 'SELECT workflow_id, name, description, created_at, updated_at, is_public, user_id FROM workflows WHERE user_id = ? ORDER BY updated_at DESC LIMIT 10';
         const [workflows] = await pool.execute(query, [userId]);
         res.json({
             success: true,

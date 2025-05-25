@@ -1,4 +1,11 @@
 /* File: frontend/src/index.css */
+:root {
+  --sidebar-footer-bg: #ede7f6;
+  --sidebar-footer-dark-bg: #2a2139;
+  --content-bg: #f8f6fc;
+  --content-dark-bg: #211a2e;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
