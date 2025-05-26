@@ -44,7 +44,7 @@ const SummaryCard = ({ title, value, change, up, icon }) => {
     );
 };
 
-const SensorStatusItem = ({ name, value, unit, status, icon: Icon }) => (
+const SensorStatusItem = ({ name, description, status, icon: Icon }) => (
     <div className="bg-white dark:bg-[#3a2e5a] p-4 rounded-xl shadow-sm">
         <div className="flex items-center justify-between">
             <div className="flex items-center">
@@ -53,15 +53,14 @@ const SensorStatusItem = ({ name, value, unit, status, icon: Icon }) => (
                 </div>
                 <div className="ml-3">
                     <p className="text-sm font-medium text-gray-900 dark:text-white">{name}</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">{value}{unit}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{description}</p>
                 </div>
             </div>
             <span className={`px-2 py-1 text-xs rounded-full ${
-                status === 'normal' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                status === 'warning' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
             }`}>
-                {status === 'normal' ? '정상' : status === 'warning' ? '주의' : '경고'}
+                {status === 'active' ? '활성' : '비활성'}
             </span>
         </div>
     </div>
@@ -384,9 +383,8 @@ function DashboardPage() {
                 setSensorStatuses(recentDevices.map(device => ({
                     id: device.device_id,
                     name: device.name,
-                    value: device.status?.value || '--',
-                    unit: device.unit || '',
-                    status: device.status?.condition || 'normal'
+                    description: device.description,
+                    status: (device.status?.online === true || device.status?.online === 1 || device.status?.online === 'true') ? 'active' : 'inactive'
                 })));
             } catch (error) {
                 console.error('디바이스 상태 로드 실패:', error);
@@ -462,8 +460,7 @@ function DashboardPage() {
                                     <SensorStatusItem 
                                         key={sensor.id}
                                         name={sensor.name}
-                                        value={sensor.value}
-                                        unit={sensor.unit}
+                                        description={sensor.description}
                                         status={sensor.status}
                                         icon={getIconComponentForSensor(sensor.name)}
                                     />

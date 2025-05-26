@@ -44,7 +44,10 @@ export const register = async (userData) => {
             password: userData.password,
             name: userData.name,
             email: userData.email,
-            phone: userData.phone || null
+            phone: userData.phone || null,
+            gender: userData.gender || null,
+            birth_date: userData.birthdate ? userData.birthdate.toISOString().split('T')[0] : null,
+            address: userData.address || null
         });
 
         return response.data;
@@ -101,4 +104,11 @@ export const logout = () => {
  */
 export const isAuthenticated = () => {
     return !!getCurrentUserToken();
+};
+
+export const updateUserInfo = async (userData) => {
+  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+  return axios.put(`${API_URL}/users/update`, userData, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
 };

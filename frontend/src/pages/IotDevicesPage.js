@@ -55,7 +55,13 @@ const DeviceCard = ({ device }) => {
                     <h3 className="text-lg font-semibold text-gray-800">{device.name}</h3>
                     <p className="text-sm text-gray-500">{device.description}</p>
                 </div>
-                <DeviceStatusBadge status={device.status?.status || 'inactive'} />
+                <DeviceStatusBadge status={
+                  device.status?.online === true ||
+                  device.status?.online === 1 ||
+                  device.status?.online === 'true'
+                    ? 'active'
+                    : 'inactive'
+                } />
             </div>
             
             <div className="border-t pt-3">

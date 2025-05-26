@@ -11,7 +11,7 @@ const SALT_ROUNDS = 10; // bcrypt 솔트 라운드
 
 // register 함수
 exports.register = async (req, res) => {
-    const { userId, password, name, email, phone, gender, birthDate, address } = req.body;
+    const { userId, password, name, email, phone, gender, birthdate, address } = req.body;
 
     if (!userId || !password || !name || !email) {
         return res.status(400).json({ message: '필수 입력 필드가 누락되었습니다 (아이디, 비밀번호, 이름, 이메일).' });
@@ -27,14 +27,11 @@ exports.register = async (req, res) => {
         }
 
         const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
-        const formattedBirthDate = birthDate ? new Date(birthDate).toISOString().split('T')[0] : null;
+        const formattedBirthdate = birthdate ? new Date(birthdate).toISOString().split('T')[0] : null;
 
-        // address 필드는 users 테이블에 해당 컬럼이 있어야 합니다. 없다면 SQL 문에서 제외하거나 추가해야 합니다.
-        // 예시에서는 users 테이블에 address 컬럼이 있다고 가정하지 않으므로 SQL에서 제외합니다.
-        // 만약 address 컬럼이 있다면 INSERT 문과 파라미터 배열에 추가해주세요.
         const [result] = await connection.query(
-            'INSERT INTO users (user_id, password, name, email, phone, gender, birth_date, created_at, updated_at, status) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), ?)',
-            [userId, hashedPassword, name, email, phone, gender, formattedBirthDate, 'active']
+            'INSERT INTO users (user_id, password, name, email, phone, gender, birthdate, address, created_at, updated_at, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), ?)',
+            [userId, hashedPassword, name, email, phone, gender, formattedBirthdate, address, 'active']
         );
 
         console.log('회원가입 성공:', userId);
@@ -136,3 +133,30 @@ exports.login = async (req, res) => {
 // // export const login = async (username, password) => {
 // // ...
 // // };
+
+exports.updateUser = async (req, res) => {
+    try {
+        const userId = req.user.user_id; // 토큰에서 추출
+        const { name, email, phone, address, newPassword } = req.body;
+        if (!userId) {
+            return res.status(400).json({ success: false, message: 'user_id가 필요합니다.' });
+        }
+        // 비밀번호 변경 여부 확인
+        let updateQuery = 'UPDATE users SET name=?, email=?, phone=?, address=?';
+        let params = [name, email, phone, address];
+        if (newPassword && newPassword.length >= 4) {
+            updateQuery += ', password=?';
+            const bcrypt = require('bcrypt');
+            const hashed = await bcrypt.hash(newPassword, 10);
+            params.push(hashed);
+        }
+        updateQuery += ' WHERE user_id=?';
+        params.push(userId);
+        const pool = require('../config/database');
+        await pool.execute(updateQuery, params);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('사용자 정보 수정 오류:', error);
+        res.status(500).json({ success: false, message: '사용자 정보 수정 중 오류가 발생했습니다.' });
+    }
+};

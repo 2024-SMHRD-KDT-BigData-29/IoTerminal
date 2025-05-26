@@ -1,7 +1,8 @@
 // File: frontend/src/pages/SettingsPage.js
 import React, { useState, useEffect } from 'react';
 import { Settings } from 'lucide-react';
-import { getCurrentUserData } from '../services/authService';
+import { getCurrentUserData, updateUserInfo } from '../services/authService';
+import AddressSearchInput from '../components/common/AddressSearchInput';
 
 const defaultSettings = {
     emailNotification: true,
@@ -15,6 +16,7 @@ const defaultAccount = {
     email: '',
     phone: '',
     address: '',
+    addressDetail: '',
     password: '',
     newPassword: '',
     confirmPassword: '',
@@ -38,11 +40,25 @@ const SettingsPage = () => {
         // 로그인된 사용자 정보 가져오기
         const currentUser = getCurrentUserData();
         if (currentUser) {
+            let address = '';
+            let addressDetail = '';
+            if (currentUser.address) {
+                // address = '카카오주소 상세주소' 형태로 저장되어 있으므로, 마지막 공백 기준으로 분리
+                const arr = currentUser.address.trim().split(' ');
+                if (arr.length > 1) {
+                    addressDetail = arr.pop();
+                    address = arr.join(' ');
+                } else {
+                    address = currentUser.address;
+                }
+            }
             setAccount(prev => ({
                 ...prev,
                 name: currentUser.name || '',
                 email: currentUser.email || '',
-                phone: currentUser.phone || ''
+                phone: currentUser.phone || '',
+                address,
+                addressDetail
             }));
         }
     }, []);
@@ -62,30 +78,49 @@ const SettingsPage = () => {
     };
 
     // 계정 설정 핸들러
-    const handleAccountChange = (key, value) => {
-        setAccount(prev => ({ ...prev, [key]: value }));
-        setAccountSaved(false);
-        setAccountError('');
-        if (key === 'newPassword' || key === 'confirmPassword') {
-            const newPassword = key === 'newPassword' ? value : account.newPassword;
-            const confirmPassword = key === 'confirmPassword' ? value : account.confirmPassword;
-            if (newPassword && confirmPassword && newPassword !== confirmPassword) {
-                setPasswordMatchError('비밀번호와 비밀번호 확인이 일치하지 않습니다.');
+    const handleAccountChange = (e) => {
+        const { name, value } = e.target;
+        setAccount(prev => ({
+            ...prev,
+            [name]: value
+        }));
+
+        // 비밀번호 일치 여부 확인
+        if (name === 'newPassword' || name === 'confirmPassword') {
+            if (name === 'newPassword') {
+                setPasswordMatchError(
+                    value !== account.confirmPassword ? '비밀번호가 일치하지 않습니다.' : ''
+                );
             } else {
-                setPasswordMatchError('');
+                setPasswordMatchError(
+                    value !== account.newPassword ? '비밀번호가 일치하지 않습니다.' : ''
+                );
             }
         }
     };
-    const handleAccountSave = () => {
-        // 비밀번호 변경 유효성 검사
-        if (account.newPassword && account.newPassword !== account.confirmPassword) {
-            setAccountError('새 비밀번호와 비밀번호 확인이 일치하지 않습니다.');
-            return;
+    const handleAccountSave = async () => {
+        try {
+            setAccountError('');
+            if (account.newPassword && account.newPassword !== account.confirmPassword) {
+                setAccountError('비밀번호가 일치하지 않습니다.');
+                return;
+            }
+
+            const userData = {
+                name: account.name,
+                email: account.email,
+                phone: account.phone,
+                address: account.address + (account.addressDetail ? ` ${account.addressDetail}` : ''),
+                newPassword: account.newPassword
+            };
+
+            await updateUserInfo(userData);
+            setAccountSaved(true);
+            setTimeout(() => setAccountSaved(false), 3000);
+        } catch (error) {
+            console.error('계정 정보 수정 오류:', error);
+            setAccountError(error.response?.data?.message || '계정 정보 수정 중 오류가 발생했습니다.');
         }
-        // 실제 서비스라면 여기서 API 호출
-        localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account));
-        setAccountSaved(true);
-        setAccountError('');
     };
 
     return (
@@ -94,6 +129,7 @@ const SettingsPage = () => {
                 <Settings size={32} className="text-gray-600" />
                 <h2 className="text-2xl font-semibold text-gray-800 dark:text-[#b39ddb] mb-0">설정</h2>
             </div>
+
             {/* 탭 메뉴 */}
             <div className="flex gap-2 mb-6">
                 <button
@@ -109,6 +145,7 @@ const SettingsPage = () => {
                     계정설정
                 </button>
             </div>
+
             {/* 탭별 내용 */}
             {tab === 'notification' && (
                 <div className="bg-white dark:bg-[#3a2e5a] p-8 rounded-xl shadow-lg max-w-xl mx-auto">
@@ -179,6 +216,7 @@ const SettingsPage = () => {
                     {saved && <div className="mt-3 text-green-600 dark:text-green-400 text-center text-sm">설정이 저장되었습니다.</div>}
                 </div>
             )}
+
             {tab === 'account' && (
                 <div className="bg-white dark:bg-[#3a2e5a] p-8 rounded-xl shadow-lg max-w-xl mx-auto">
                     <h3 className="text-xl font-bold text-[#7e57c2] dark:text-[#b39ddb] mb-4">계정 관리</h3>
@@ -187,8 +225,9 @@ const SettingsPage = () => {
                             <label className="block text-sm font-medium text-[#7e57c2] mb-1">이름</label>
                             <input
                                 type="text"
+                                name="name"
                                 value={account.name}
-                                onChange={e => handleAccountChange('name', e.target.value)}
+                                onChange={handleAccountChange}
                                 className="w-full px-3 py-2 border border-[#b39ddb] rounded-md bg-gray-100 dark:bg-[#2a2139] text-[#3a2e5a] dark:text-[#b39ddb]"
                             />
                         </div>
@@ -196,38 +235,48 @@ const SettingsPage = () => {
                             <label className="block text-sm font-medium text-[#7e57c2] mb-1">이메일</label>
                             <input
                                 type="email"
+                                name="email"
                                 value={account.email}
-                                readOnly
-                                className="w-full px-3 py-2 border border-[#b39ddb] rounded-md bg-gray-100 dark:bg-[#2a2139] text-[#3a2e5a] dark:text-[#b39ddb] opacity-70 cursor-not-allowed"
+                                onChange={handleAccountChange}
+                                className="w-full px-3 py-2 border border-[#b39ddb] rounded-md bg-gray-100 dark:bg-[#2a2139] text-[#3a2e5a] dark:text-[#b39ddb]"
                             />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-[#7e57c2] mb-1">휴대폰 번호</label>
                             <input
-                                type="text"
+                                type="tel"
+                                name="phone"
                                 value={account.phone}
-                                onChange={e => handleAccountChange('phone', e.target.value)}
+                                onChange={handleAccountChange}
                                 className="w-full px-3 py-2 border border-[#b39ddb] rounded-md bg-white dark:bg-[#2a2139] text-[#3a2e5a] dark:text-[#b39ddb]"
                                 placeholder="예: 010-1234-5678"
                             />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-[#7e57c2] mb-1">주소</label>
+                            <AddressSearchInput
+                                value={account.address}
+                                onAddressSelect={(address) => handleAccountChange({ target: { name: 'address', value: address } })}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-[#7e57c2] mb-1 mt-2">상세주소</label>
                             <input
                                 type="text"
-                                value={account.address}
-                                onChange={e => handleAccountChange('address', e.target.value)}
-                                className="w-full px-3 py-2 border border-[#b39ddb] rounded-md bg-white dark:bg-[#2a2139] text-[#3a2e5a] dark:text-[#b39ddb]"
-                                placeholder="주소를 입력하세요"
-                                autoComplete="off"
+                                name="addressDetail"
+                                value={account.addressDetail}
+                                onChange={handleAccountChange}
+                                className="w-full px-3 py-2 border border-[#b39ddb] rounded-md bg-white dark:bg-[#2a2139] text-[#3a2e5a] dark:text-[#b39ddb] placeholder-[#b39ddb] focus:ring-2 focus:ring-[#7e57c2] focus:border-[#7e57c2] transition"
+                                placeholder="상세주소를 입력하세요 (예: 101동 202호)"
                             />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-[#7e57c2] mb-1">수정할 비밀번호</label>
                             <input
                                 type="password"
+                                name="newPassword"
                                 value={account.newPassword}
-                                onChange={e => handleAccountChange('newPassword', e.target.value)}
+                                onChange={handleAccountChange}
                                 className="w-full px-3 py-2 border border-[#b39ddb] rounded-md bg-white dark:bg-[#2a2139] text-[#3a2e5a] dark:text-[#b39ddb]"
                                 autoComplete="new-password"
                             />
@@ -236,8 +285,9 @@ const SettingsPage = () => {
                             <label className="block text-sm font-medium text-[#7e57c2] mb-1">수정할 비밀번호 확인</label>
                             <input
                                 type="password"
+                                name="confirmPassword"
                                 value={account.confirmPassword}
-                                onChange={e => handleAccountChange('confirmPassword', e.target.value)}
+                                onChange={handleAccountChange}
                                 className="w-full px-3 py-2 border border-[#b39ddb] rounded-md bg-white dark:bg-[#2a2139] text-[#3a2e5a] dark:text-[#b39ddb]"
                                 autoComplete="new-password"
                             />

@@ -161,6 +161,16 @@ function PropertyEditor({ selectedNode, onUpdateNode }) {
                         </div>
                     </>
                 )}
+                <div>
+                    <label className="block text-sm font-medium text-[#7e57c2] mb-1">세부사항</label>
+                    <textarea
+                        value={localProperties.description || ''}
+                        onChange={e => handlePropertyChange('description', e.target.value)}
+                        className="w-full px-3 py-2 border border-[#b39ddb] rounded-md focus:ring-2 focus:ring-[#7e57c2] focus:border-[#7e57c2] transition"
+                        placeholder="이 노드에 대한 세부사항을 입력하세요"
+                        rows={3}
+                    />
+                </div>
             </div>
         </div>
     );

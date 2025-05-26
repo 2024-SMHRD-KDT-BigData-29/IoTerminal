@@ -13,6 +13,7 @@ const dashboardRoutes = require('./routes/dashboardRoutes');
 const calendarRoutes = require('./routes/calendarRoutes');
 const deviceRoutes = require('./routes/deviceRoutes');
 const weatherRoutes = require('./routes/weatherRoutes');
+const usersRoutes = require('./routes/users');
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -57,6 +58,7 @@ app.use('/api/devices', deviceRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/weather', weatherRoutes);
+app.use('/api/users', usersRoutes);
 
 // 테스트 라우트
 app.get('/test', (req, res) => {

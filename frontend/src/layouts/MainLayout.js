@@ -6,6 +6,7 @@ import io from 'socket.io-client';
 import Sidebar from './Sidebar';
 
 const SOCKET_SERVER_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:3001';
+const KAKAO_REST_API_KEY = process.env.REACT_APP_KAKAO_REST_API_KEY;
 
 const MainLayout = () => {
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -90,7 +91,30 @@ const MainLayout = () => {
         return () => socket.disconnect();
     }, []);
 
-    // File: frontend/src/layouts/MainLayout.js (현재 위치 가져오는 useEffect 부분)
+    async function getKakaoAddress(lat, lng) {
+        console.log('KAKAO_REST_API_KEY:', KAKAO_REST_API_KEY); // 환경변수 값 확인
+        if (!KAKAO_REST_API_KEY) {
+            console.error('카카오 REST API 키가 환경변수에서 불러와지지 않았습니다. .env 파일과 서버 재시작을 확인하세요.');
+            return 'API 키 오류';
+        }
+        const url = `https://dapi.kakao.com/v2/local/geo/coord2address.json?x=${lng}&y=${lat}`;
+        const res = await fetch(url, {
+            headers: {
+                Authorization: `KakaoAK ${KAKAO_REST_API_KEY}`
+            }
+        });
+        if (!res.ok) {
+            const errorText = await res.text();
+            console.error(`카카오 API 요청 실패: ${res.status} ${res.statusText}`, errorText);
+            if (res.status === 401) return 'API 인증 오류(401)';
+            if (res.status === 403) return 'API 권한 오류(403)';
+            return 'API 요청 실패';
+        }
+        const data = await res.json();
+        const address = data.documents?.[0]?.address?.address_name;
+        return address || '주소 정보 없음';
+    }
+
     useEffect(() => {
         if (!navigator.geolocation) {
             setCurrentLocation('위치 정보 사용 불가');
@@ -99,46 +123,14 @@ const MainLayout = () => {
         navigator.geolocation.getCurrentPosition(
             async (position) => {
                 const { latitude, longitude } = position.coords;
-                console.log("[MainLayout Geolocation] 위도:", latitude, "경도:", longitude);
-
-                if (typeof latitude !== 'number' || typeof longitude !== 'number' || isNaN(latitude) || isNaN(longitude)) {
-                    console.error("[MainLayout Geolocation] 유효하지 않은 좌표값 수신:", { latitude, longitude });
-                    setCurrentLocation('유효하지 않은 좌표');
-                    return;
-                }
-
                 try {
-                    const apiUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1&accept-language=ko`;
-                    console.log("[MainLayout Geolocation] Nominatim API 요청 URL:", apiUrl);
-                    
-                    const res = await fetch(apiUrl, {
-                        method: 'GET', // 명시적으로 GET 명시 (기본값이지만)
-                        headers: {
-                            'Accept': 'application/json' // 어떤 타입의 응답을 받을지 명시
-                        }
-                    });
-
-                    console.log("[MainLayout Geolocation] Nominatim API 응답 상태:", res.status, res.statusText);
-
-                    if (!res.ok) { // 400 포함 모든 에러 상태 체크
-                        // 오류 응답 본문을 텍스트로 읽어보거나, JSON으로 시도
-                        let errorBodyText = await res.text(); // 서버가 보낸 오류 메시지 확인 시도
-                        console.error("[MainLayout Geolocation] Nominatim API 오류 응답:", errorBodyText);
-                        throw new Error(`Nominatim API 요청 실패: ${res.status} ${res.statusText}. 서버 응답: ${errorBodyText.substring(0,100)}...`);
-                    }
-                    
-                    const data = await res.json();
-                    console.log("[MainLayout Geolocation] Nominatim API 응답 데이터:", data);
-                    
-                    setCurrentLocation(data.display_name || '주소 정보 없음');
-
+                    const address = await getKakaoAddress(latitude, longitude);
+                    setCurrentLocation(address);
                 } catch (error) {
-                    console.error("[MainLayout Geolocation] 주소 변환 중 오류:", error);
                     setCurrentLocation('주소 변환 실패');
                 }
             },
             (error) => {
-                console.error("[MainLayout Geolocation] 위치 정보 가져오기 오류:", error.code, error.message);
                 let errorMessage = '위치 권한 필요 또는 오류';
                 if (error.code === 1) errorMessage = '위치 정보 접근 권한이 거부되었습니다.';
                 else if (error.code === 2) errorMessage = '위치 정보를 사용할 수 없습니다 (예: 네트워크 오류).';
@@ -147,7 +139,7 @@ const MainLayout = () => {
             },
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
-    }, []); // 컴포넌트 마운트 시 한 번만 실행
+    }, []);
 
     return (
         <div className="flex flex-col min-h-screen bg-[var(--content-bg)] dark:bg-[var(--content-dark-bg)] transition-colors duration-300">

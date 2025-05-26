@@ -203,6 +203,7 @@ const WorkflowCanvasPage = () => {
                         value={workflowName}
                         onChange={(e) => setWorkflowName(e.target.value)}
                         className="text-xl font-semibold bg-transparent border-b border-[#d1c4e9] dark:border-[#9575cd] focus:border-[#7e57c2] dark:focus:border-[#b39ddb] focus:outline-none px-2 py-1 text-[#3a2e5a] dark:text-[#b39ddb]"
+                        placeholder="워크플로우 이름"
                     />
                 </div>
                 <div className="flex items-center space-x-2">

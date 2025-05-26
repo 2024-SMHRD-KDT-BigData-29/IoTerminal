@@ -5,6 +5,7 @@ import { Eye, EyeOff } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import { register, login } from '../services/authService';
+import AddressSearchInput from '../components/common/AddressSearchInput';
 
 // DatePicker 커스텀 스타일
 const customDatePickerStyles = {
@@ -54,8 +55,9 @@ const RegisterPage = () => {
         phone: '',
         gender: '',
         name: '',
-        birthDate: null,
-        address: ''
+        birthdate: null,
+        address: '',
+        addressDetail: ''
     });
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -89,7 +91,7 @@ const RegisterPage = () => {
     const handleDateChange = (date) => {
         setFormData(prev => ({
             ...prev,
-            birthDate: date
+            birthdate: date
         }));
     };
 
@@ -103,7 +105,10 @@ const RegisterPage = () => {
         }
 
         try {
-            await register(formData);
+            await register({
+                ...formData,
+                address: `${formData.address} ${formData.addressDetail}`.trim()
+            });
             // 회원가입 성공 후 로그인 페이지로 이동
             alert('회원가입이 완료되었습니다. 로그인 페이지로 이동합니다.');
             navigate('/login');
@@ -291,11 +296,11 @@ const RegisterPage = () => {
                         </div>
 
                         <div>
-                            <label htmlFor="birthDate" className="block text-sm font-medium text-[#3a2e5a] dark:text-[#b39ddb]">
+                            <label htmlFor="birthdate" className="block text-sm font-medium text-[#3a2e5a] dark:text-[#b39ddb]">
                                 생년월일
                             </label>
                             <DatePicker
-                                selected={formData.birthDate}
+                                selected={formData.birthdate}
                                 onChange={handleDateChange}
                                 dateFormat="yyyy/MM/dd"
                                 className="mt-1 block w-full px-4 py-3 rounded-xl border border-[#d1c4e9] dark:border-[#9575cd] bg-white dark:bg-[#2a2139] text-[#3a2e5a] dark:text-[#b39ddb] placeholder-[#9575cd] dark:placeholder-[#b39ddb] focus:ring-2 focus:ring-[#7e57c2] dark:focus:ring-[#9575cd] focus:border-transparent transition-colors duration-200"
@@ -314,16 +319,24 @@ const RegisterPage = () => {
                             <label htmlFor="address" className="block text-sm font-medium text-[#3a2e5a] dark:text-[#b39ddb]">
                                 주소
                             </label>
-                            <input
-                                id="address"
-                                name="address"
-                                type="text"
-                                required
+                            <AddressSearchInput
                                 value={formData.address}
-                                onChange={handleChange}
+                                onChange={addr => setFormData(prev => ({ ...prev, address: addr }))}
+                            />
+                        </div>
+
+                        <div>
+                            <label htmlFor="addressDetail" className="block text-sm font-medium text-[#3a2e5a] dark:text-[#b39ddb] mt-2">
+                                상세주소
+                            </label>
+                            <input
+                                id="addressDetail"
+                                name="addressDetail"
+                                type="text"
+                                value={formData.addressDetail}
+                                onChange={e => setFormData(prev => ({ ...prev, addressDetail: e.target.value }))}
                                 className="mt-1 block w-full px-4 py-3 rounded-xl border border-[#d1c4e9] dark:border-[#9575cd] bg-white dark:bg-[#2a2139] text-[#3a2e5a] dark:text-[#b39ddb] placeholder-[#9575cd] dark:placeholder-[#b39ddb] focus:ring-2 focus:ring-[#7e57c2] dark:focus:ring-[#9575cd] focus:border-transparent transition-colors duration-200"
-                                placeholder="주소를 입력하세요"
-                                autoComplete="off"
+                                placeholder="상세주소를 입력하세요 (예: 101동 202호)"
                             />
                         </div>
                     </div>
