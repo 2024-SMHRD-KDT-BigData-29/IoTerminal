@@ -1,7 +1,7 @@
 // File: frontend/src/pages/IotDevicesPage.js
 import React, { useState, useEffect } from 'react';
 import { BarChart as IconBarChart, Battery, Wifi, AlertTriangle, Plus } from 'lucide-react';
-import { getUserDevices } from '../services/deviceService';
+import { getUserDevices, getDeviceSensors } from '../services/deviceService';
 import DeviceCreateForm from '../components/device/DeviceCreateForm';
 
 const DeviceStatusBadge = ({ status }) => {
@@ -26,6 +26,8 @@ const DeviceStatusBadge = ({ status }) => {
 };
 
 const DeviceCard = ({ device }) => {
+    const [sensors, setSensors] = useState([]);
+
     const getBatteryColor = (level) => {
         if (level > 70) return 'text-green-500';
         if (level > 30) return 'text-yellow-500';
@@ -48,6 +50,12 @@ const DeviceCard = ({ device }) => {
                 return `${device.status.last_reading}`;
         }
     };
+
+    useEffect(() => {
+        if (device.device_id) {
+            getDeviceSensors(device.device_id).then(setSensors).catch(() => setSensors([]));
+        }
+    }, [device.device_id]);
 
     return (
         <div className="bg-white rounded-lg shadow p-4 hover:shadow-md transition-shadow">
@@ -80,6 +88,20 @@ const DeviceCard = ({ device }) => {
                     <p className="text-sm text-gray-600">
                         최근 측정값: {getLastReadingText(device)}
                     </p>
+                </div>
+                <div className="mt-3">
+                    <p className="text-xs text-gray-500 font-semibold mb-1">연결된 센서</p>
+                    {sensors.length === 0 ? (
+                        <span className="text-xs text-gray-400">센서 없음</span>
+                    ) : (
+                        <ul className="text-xs text-gray-700 space-y-0.5">
+                            {sensors.map(sensor => (
+                                <li key={sensor.sensor_id}>
+                                    {sensor.name} <span className="text-gray-400">({sensor.type})</span>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
                 </div>
             </div>
         </div>

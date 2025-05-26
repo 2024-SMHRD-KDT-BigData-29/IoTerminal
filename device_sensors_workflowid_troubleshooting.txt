@@ -37,3 +37,11 @@ ALTER TABLE device_sensors
 6. 추가 팁
 - 개발 환경에서는 테이블을 드롭 후 재생성해도 되지만, 운영 환경에서는 반드시 데이터 유실에 주의해서 ALTER TABLE로 컬럼만 추가하세요.
 - 마이그레이션 시스템을 사용 중이라면, DB 구조와 마이그레이션 파일이 항상 일치하는지 주기적으로 점검하세요. 
+
+ 트러블슈팅 사례 및 해결 방법
+센서 중복 문제: 커스텀 센서 드래그 시 고유값 부여, 백엔드 중복 체크 강화
+device_sensors 연관 삭제: 워크플로우 삭제 시 DB CASCADE+수동 삭제 쿼리로 완전 삭제
+API 경로 중복: 환경변수에 /api가 포함된 경우 서비스 코드에서 /api 제거
+SQL 구문 오류: VALUES ? → 동적 쿼리+flat 배열로 수정
+센서 등록 누락: sensorId 없는 노드만 createSensor 호출, 고유값 부여로 신규 센서 인식
+줄바꿈 경고: .gitattributes, VSCode, dos2unix 등으로 LF 통일
