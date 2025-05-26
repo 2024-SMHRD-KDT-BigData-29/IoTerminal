@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Plus, Save, Trash2, Upload } from 'lucide-react';
 import WorkflowCanvas from '../components/workflow/WorkflowCanvas';
@@ -7,10 +7,16 @@ import PropertyEditor from '../components/workflow/PropertyEditor';
 import { saveWorkflow, getWorkflowById } from '../api/workflow';
 import { getCurrentUserData } from '../services/authService';
 import { API_URL } from '../config';
+import { createSensor } from '../services/sensorService';
 
 const WorkflowCanvasPage = () => {
     const [elements, setElements] = useState([]);
+    const elementsRef = useRef(elements);
+    useEffect(() => {
+        elementsRef.current = elements;
+    }, [elements]);
     const [selectedNode, setSelectedNode] = useState(null);
+    const [selectedEdgeId, setSelectedEdgeId] = useState(null);
     const [workflowName, setWorkflowName] = useState('새 워크플로우');
     const [showImportModal, setShowImportModal] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -18,15 +24,42 @@ const WorkflowCanvasPage = () => {
     const { workflowId } = useParams();
     const cyRef = useRef(null);
 
+    // elements를 set할 때 항상 구조를 보정 (불러오기 등)
+    const setElementsFiltered = useCallback((newElements) => {
+        if (!Array.isArray(newElements)) {
+            setElements([]);
+            return;
+        }
+        const nodes = newElements.filter(el => el.group === 'nodes').map(normalizeNode);
+        // group이 없지만 data.source/data.target이 있으면 엣지로 간주하여 group: 'edges' 부여
+        let edges = newElements
+            .filter(el => (el.group === 'edges') || (!el.group && el.data && el.data.source && el.data.target))
+            .map(edge => ({
+                group: 'edges',
+                data: {
+                    id: edge.data.id,
+                    source: edge.data.source,
+                    target: edge.data.target,
+                    label: edge.data.label || '',
+                    type: edge.data.type || 'default'
+                }
+            }));
+        const allElements = [...nodes, ...edges];
+        console.log('불러온 elements:', allElements);
+        setElements(allElements);
+    }, []);
+
     // 워크플로우 불러오기
     useEffect(() => {
+        // elements가 의존성 배열에 들어가면 삭제/추가 시마다 불러오기 반복됨 (절대 넣지 말 것!)
         if (workflowId) {
             const fetchWorkflow = async () => {
                 try {
                     const response = await getWorkflowById(workflowId);
                     if (response.success) {
                         setWorkflowName(response.workflow.name);
-                        setElements([...response.workflow.nodes, ...response.workflow.edges]);
+                        setElementsFiltered([...response.workflow.nodes, ...response.workflow.edges]);
+                        console.log('[불러오기] setElementsFiltered 호출됨');
                     } else {
                         throw new Error(response.message || '워크플로우를 불러오는데 실패했습니다.');
                     }
@@ -43,7 +76,28 @@ const WorkflowCanvasPage = () => {
             };
             fetchWorkflow();
         }
-    }, [workflowId, navigate]);
+    }, [workflowId, navigate, setElementsFiltered]);
+
+    // 노드/엣지 정규화 함수
+    function normalizeNode(node) {
+        return {
+            group: 'nodes',
+            ...node,
+            data: { ...node.data }
+        };
+    }
+    function normalizeEdge(edge) {
+        return {
+            group: 'edges',
+            data: {
+                id: edge.data?.id || edge.id,
+                source: edge.data?.source || edge.source,
+                target: edge.data?.target || edge.target,
+                label: edge.data?.label || edge.label || '',
+                type: edge.data?.type || edge.type || 'default'
+            }
+        };
+    }
 
     const handleSaveWorkflow = async () => {
         if (!workflowName.trim()) {
@@ -61,8 +115,38 @@ const WorkflowCanvasPage = () => {
 
         setIsSaving(true);
         try {
-            let nodes = elements.filter(el => el.group === 'nodes');
-            let edges = elements.filter(el => el.group === 'edges');
+            // 최신 elements에서 edges 추출
+            const currentElements = elements;
+            const edges = currentElements.filter(el => el.group === 'edges');
+            console.log('[저장] 저장 직전 edges:', edges);
+
+            let nodes = currentElements.filter(el => el.group === 'nodes').map(normalizeNode);
+            let edgesToSave = edges.map(normalizeEdge);
+            console.log('[저장 직전 elements]', currentElements);
+            console.log('[저장 직전 edges]', edgesToSave);
+
+            // 유효한 엣지만 필터링
+            edgesToSave = filterValidEdges(nodes, edgesToSave);
+
+            // 엣지 데이터 정규화
+            edgesToSave = edgesToSave.map(edge => ({
+                group: 'edges',
+                data: {
+                    id: edge.data.id,
+                    source: edge.data.source,
+                    target: edge.data.target,
+                    label: edge.data.label || '',
+                    type: edge.data.type || 'default'
+                }
+            }));
+
+            // 노드 데이터 정규화
+            nodes = nodes.map(node => ({
+                group: 'nodes',
+                ...node
+            }));
+
+            console.log('필터링된 엣지:', edgesToSave);
 
             // position 정보가 없는 노드가 있으면 Cytoscape에서 가져와서 추가
             if (cyRef.current) {
@@ -77,16 +161,104 @@ const WorkflowCanvasPage = () => {
                 });
             }
 
+            // === 신규(커스텀) 센서 먼저 등록 ===
+            const sensorNodes = nodes.filter(n => n.data.type === 'Sensor');
+            for (const sensorNode of sensorNodes) {
+                if (!sensorNode.data.sensorId) {
+                    // 신규 센서 등록
+                    console.log('[센서 생성 시도]', sensorNode);
+                    const res = await createSensor({
+                        name: sensorNode.data.label,
+                        type: sensorNode.data.sensorType || 'CUSTOM',
+                        description: sensorNode.data.description || '',
+                        config: sensorNode.data.config || {}
+                    });
+                    if (res.data && res.data.success && res.data.sensor_id) {
+                        sensorNode.data.sensorId = res.data.sensor_id;
+                        console.log('[센서 생성 성공]', res.data.sensor_id);
+                    } else if (res.success && res.sensor_id) {
+                        sensorNode.data.sensorId = res.sensor_id;
+                        console.log('[센서 생성 성공]', res.sensor_id);
+                    } else {
+                        console.error('[센서 생성 실패]', res);
+                        alert('센서 등록에 실패했습니다.');
+                        setIsSaving(false);
+                        return;
+                    }
+                } else {
+                    console.log('[센서 이미 존재]', sensorNode.data.sensorId);
+                }
+            }
+
+            // === elements 전체 구조 상세 출력 및 id 매핑 보정 ===
+            console.log('[디버깅] elements 전체:', elements);
+            const nodeIdSet = new Set(nodes.map(n => n.data.id));
+            elements.forEach(el => {
+                if (el.group === 'nodes') {
+                    console.log('노드:', el.data.id, el.data.type, el.data.deviceId, el.data.sensorId);
+                }
+                if (el.group === 'edges') {
+                    console.log('엣지:', el.data.id, el.data.source, el.data.target);
+                    if (!nodeIdSet.has(el.data.source)) {
+                        console.warn('[경고] 엣지 source가 노드 id와 불일치:', el.data.source);
+                    }
+                    if (!nodeIdSet.has(el.data.target)) {
+                        console.warn('[경고] 엣지 target이 노드 id와 불일치:', el.data.target);
+                    }
+                }
+            });
+            // === 디바이스-센서 연결 정보 추출 ===
+            const deviceNodes = nodes.filter(n => n.data.type === 'Device');
+            // sensorNodes는 위에서 선언된 것 재사용
+            console.log('[디버깅] deviceNodes:', deviceNodes);
+            console.log('[디버깅] sensorNodes:', sensorNodes);
+            console.log('[디버깅] edgesToSave:', edgesToSave);
+            let deviceSensorLinks = [];
+            deviceNodes.forEach(deviceNode => {
+                const connectedEdges = edgesToSave.filter(e => e.data.source === deviceNode.data.id);
+                connectedEdges.forEach(edge => {
+                    const sensorNode = nodes.find(n => n.data.id === edge.data.target && n.data.type === 'Sensor');
+                    if (!sensorNode) {
+                        console.warn('[디버깅] sensorNode 못 찾음:', edge.data.target, nodes);
+                        console.warn('[디버깅] elements 전체:', elements);
+                    }
+                    // DB 컬럼명에 맞춰서 device_id, sensor_id로 명확히 매핑
+                    const device_id = deviceNode.data.deviceId;
+                    const sensor_id = sensorNode?.data.sensorId;
+                    if (sensorNode && device_id && sensor_id) {
+                        const config = {
+                            ...sensorNode.data.config,
+                            sensorType: sensorNode.data.sensorType || 'CUSTOM',
+                            description: sensorNode.data.description || ''
+                        };
+                        deviceSensorLinks.push({
+                            device_id,
+                            sensor_id,
+                            config
+                        });
+                        console.log('[deviceSensorLinks 추가]', {
+                            device_id,
+                            sensor_id,
+                            config
+                        });
+                    } else {
+                        console.warn('[deviceSensorLinks 누락] device_id:', device_id, 'sensor_id:', sensor_id, 'deviceNode:', deviceNode, 'sensorNode:', sensorNode);
+                        console.warn('[디버깅] elements 전체:', elements);
+                    }
+                });
+            });
+            console.log('[deviceSensorLinks 최종]', deviceSensorLinks);
+
             const workflowData = {
                 name: workflowName,
                 description: '',
                 nodes: nodes,
-                edges: edges,
+                edges: edgesToSave,
                 userId: userId,
-                isPublic: false
+                isPublic: false,
+                deviceSensorLinks
             };
-
-            console.log('저장될 워크플로우 데이터:', workflowData);
+            console.log('[워크플로우 저장 요청 데이터]', workflowData);
 
             let data;
             if (workflowId) {
@@ -100,9 +272,11 @@ const WorkflowCanvasPage = () => {
                     body: JSON.stringify(workflowData)
                 });
                 data = await response.json();
+                console.log('[워크플로우 수정 응답]', data);
             } else {
                 // 새 워크플로우 생성
                 data = await saveWorkflow(workflowData);
+                console.log('[워크플로우 생성 응답]', data);
             }
 
             if (data.success) {
@@ -121,7 +295,7 @@ const WorkflowCanvasPage = () => {
 
     const handleClearCanvas = () => {
         if (window.confirm('모든 노드와 연결이 삭제됩니다. 계속하시겠습니까?')) {
-            setElements([]);
+            setElementsFiltered([]);
             setSelectedNode(null);
         }
     };
@@ -137,7 +311,7 @@ const WorkflowCanvasPage = () => {
             reader.onload = (e) => {
                 try {
                     const workflowData = JSON.parse(e.target.result);
-                    setElements(workflowData.elements || []);
+                    setElementsFiltered(workflowData.elements || []);
                     setWorkflowName(workflowData.name || '불러온 워크플로우');
                     setShowImportModal(false);
                 } catch (error) {
@@ -150,7 +324,6 @@ const WorkflowCanvasPage = () => {
 
     const handleCyInit = (cy) => {
         cyRef.current = cy;
-        
         // 노드 클릭 이벤트 처리
         cy.on('tap', 'node', (evt) => {
             const node = evt.target;
@@ -158,13 +331,21 @@ const WorkflowCanvasPage = () => {
                 id: node.id(),
                 data: node.data()
             });
+            setSelectedEdgeId(null); // 노드 클릭 시 엣지 선택 해제
         });
 
         // 캔버스 클릭 시 선택 해제
         cy.on('tap', (evt) => {
             if (evt.target === cy) {
                 setSelectedNode(null);
+                setSelectedEdgeId(null);
             }
+        });
+
+        // 엣지 클릭 시 선택만
+        cy.on('tap', 'edge', (evt) => {
+            const edge = evt.target;
+            setSelectedEdgeId(edge.id());
         });
     };
 
@@ -183,7 +364,6 @@ const WorkflowCanvasPage = () => {
                 return el;
             })
         );
-
         // Cytoscape 그래프 업데이트
         if (cyRef.current) {
             const node = cyRef.current.getElementById(nodeId);
@@ -191,6 +371,33 @@ const WorkflowCanvasPage = () => {
                 node.data(updatedProps);
             }
         }
+    };
+
+    // 엣지 정제 함수 추가
+    function filterValidEdges(nodes, edges) {
+        return edges.filter(edge => {
+            const sourceNode = nodes.find(n => n.data.id === edge.data.source);
+            const targetNode = nodes.find(n => n.data.id === edge.data.target);
+            const hasRequiredData = edge.data && edge.data.source && edge.data.target && edge.data.id;
+            const isDifferentNodes = edge.data.source !== edge.data.target;
+            return sourceNode && targetNode && hasRequiredData && isDifferentNodes;
+        });
+    }
+
+    // 내가 지운 엣지만 삭제하는 함수 (디버깅 추가)
+    const handleDeleteEdge = (edgeId) => {
+        console.log('[엣지삭제] 삭제 요청된 edgeId:', edgeId);
+        setElements(prevElements => {
+            const newElements = prevElements.filter(
+                el => !(el.group === 'edges' && el.data.id === edgeId)
+            );
+            elementsRef.current = newElements; // 삭제 후 바로 최신 상태로 갱신
+            const newEdges = newElements.filter(el => el.group === 'edges');
+            console.log('[엣지삭제] 삭제 후 elements 길이:', newElements.length);
+            console.log('[엣지삭제] 삭제 후 edges:', newEdges);
+            return newElements;
+        });
+        setSelectedEdgeId(null); // 삭제 후 선택 해제
     };
 
     return (
@@ -236,7 +443,10 @@ const WorkflowCanvasPage = () => {
             <div className="flex-1 flex overflow-hidden min-h-0">
                 {/* 왼쪽 노드 팔레트 */}
                 <div className="w-60 bg-white dark:bg-[#3a2e5a] shadow-sm border-r border-[#d1c4e9] dark:border-[#9575cd] overflow-y-auto">
-                    <NodePalette />
+                    <NodePalette 
+                        selectedEdgeId={selectedEdgeId}
+                        onDeleteEdge={handleDeleteEdge}
+                    />
                 </div>
 
                 {/* 중앙 캔버스 */}
@@ -246,6 +456,8 @@ const WorkflowCanvasPage = () => {
                         setElements={setElements}
                         onCyInit={handleCyInit}
                         selectedNodeId={selectedNode?.id}
+                        selectedEdgeId={selectedEdgeId}
+                        handleDeleteEdge={handleDeleteEdge}
                     />
                 </div>
 

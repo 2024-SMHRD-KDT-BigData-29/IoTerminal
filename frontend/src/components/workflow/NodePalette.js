@@ -1,6 +1,6 @@
 // File: frontend/src/components/workflow/NodePalette.js
 import React, { useState, useEffect } from 'react';
-import { Settings, Filter, Sliders as LucideSliders, BarChart, Eye, MessageSquare, Server, Database, HelpCircle, GitFork } from 'lucide-react';
+import { Settings, Filter, Sliders as LucideSliders, BarChart, Eye, MessageSquare, Server, Database, HelpCircle, GitFork, Plus, Trash2 } from 'lucide-react';
 import { getUserDevices } from '../../services/deviceService';
 
 const nodeGroups = [
@@ -8,7 +8,7 @@ const nodeGroups = [
         title: '입력 소스',
         nodes: [
             { 
-                type: 'Input', 
+                type: 'Sensor', 
                 label: '커스텀 센서', 
                 icon: <Settings size={18} className="mr-2 text-blue-500" />, 
                 config: {
@@ -95,7 +95,7 @@ const nodeGroups = [
     }
 ];
 
-function NodePalette() {
+function NodePalette({ selectedEdgeId, onDeleteEdge }) {
     const [userDevices, setUserDevices] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -123,10 +123,24 @@ function NodePalette() {
         loadUserDevices();
     }, []);
 
-    const onDragStart = (event, nodeType, nodeLabel, nodeConfig) => {
+    const onDragStart = (event, nodeType, nodeLabel, nodeConfig, extraData) => {
+        let finalLabel = nodeLabel;
+        let finalConfig = { ...nodeConfig };
+        // 커스텀 센서일 경우 고유값 추가
+        if (nodeType === 'Sensor' && nodeLabel === '커스텀 센서') {
+            const uniqueSuffix = Date.now();
+            finalLabel = `${nodeLabel} ${uniqueSuffix}`;
+            finalConfig = { ...finalConfig, uniqueKey: uniqueSuffix };
+        }
         event.dataTransfer.setData('application/reactflow-nodetype', nodeType);
-        event.dataTransfer.setData('application/reactflow-nodelabel', nodeLabel);
-        event.dataTransfer.setData('application/reactflow-nodeconfig', JSON.stringify(nodeConfig || {}));
+        event.dataTransfer.setData('application/reactflow-nodelabel', finalLabel);
+        event.dataTransfer.setData('application/reactflow-nodeconfig', JSON.stringify(finalConfig || {}));
+        if (extraData && extraData.deviceId) {
+            event.dataTransfer.setData('application/reactflow-deviceid', extraData.deviceId);
+        }
+        if (extraData && extraData.sensorType) {
+            event.dataTransfer.setData('application/reactflow-sensortype', extraData.sensorType);
+        }
         event.dataTransfer.effectAllowed = 'move';
     };
 
@@ -139,7 +153,8 @@ function NodePalette() {
             deviceId: device.device_id,
             deviceType: device.type,
             ...device.config
-        }
+        },
+        extraData: { deviceId: device.device_id }
     }));
 
     // 디바이스 그룹을 데이터 처리와 출력 및 액션 사이에 삽입
@@ -155,8 +170,20 @@ function NodePalette() {
 
     return (
         <div className="h-full overflow-y-auto custom-scrollbar">
-            <div className="p-4 border-b sticky top-0 bg-white z-10">
+            <div className="p-4 border-b sticky top-0 bg-white z-10 flex justify-between items-center">
                 <h3 className="font-semibold text-sm text-gray-700">컴포넌트</h3>
+                <button
+                    onClick={() => selectedEdgeId && onDeleteEdge(selectedEdgeId)}
+                    disabled={!selectedEdgeId}
+                    className={`p-1 rounded-md transition-colors duration-200 ${
+                        selectedEdgeId 
+                            ? 'text-red-500 hover:bg-red-50' 
+                            : 'text-gray-400 cursor-not-allowed'
+                    }`}
+                    title="선택된 연결 삭제"
+                >
+                    <Trash2 size={18} />
+                </button>
             </div>
             <div className="p-4">
                 {isLoading ? (
@@ -173,7 +200,7 @@ function NodePalette() {
                                 {group.nodes.map((node) => (
                                     <div
                                         key={node.label}
-                                        onDragStart={(event) => onDragStart(event, node.type, node.label, node.config)}
+                                        onDragStart={(event) => onDragStart(event, node.type, node.label, node.config, node.extraData)}
                                         draggable
                                         className="px-3 py-2.5 bg-gray-50 rounded-md border border-gray-200 flex items-center space-x-2.5 cursor-grab hover:bg-gray-100 hover:shadow-sm active:cursor-grabbing transition-all duration-150"
                                         title={`${node.label} 추가`}

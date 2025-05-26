@@ -7,7 +7,7 @@ import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import WorkflowPage from './pages/WorkflowPage';
 import WorkflowCanvasPage from './pages/WorkflowCanvasPage';
-import DataManagementPage from './pages/DataManagementPage';
+// import DataManagementPage from './pages/DataManagementPage';
 import IotDevicesPage from './pages/IotDevicesPage';
 import SettingsPage from './pages/SettingsPage';
 import DataAnalysisPage from './pages/DataAnalysisPage';

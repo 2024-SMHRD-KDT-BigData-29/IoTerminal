@@ -1,7 +1,8 @@
 // File: frontend/src/pages/IotDevicesPage.js
 import React, { useState, useEffect } from 'react';
-import { BarChart as IconBarChart, Battery, Wifi, AlertTriangle } from 'lucide-react';
+import { BarChart as IconBarChart, Battery, Wifi, AlertTriangle, Plus } from 'lucide-react';
 import { getUserDevices } from '../services/deviceService';
+import DeviceCreateForm from '../components/device/DeviceCreateForm';
 
 const DeviceStatusBadge = ({ status }) => {
     const getStatusColor = (status) => {
@@ -85,36 +86,65 @@ const DeviceCard = ({ device }) => {
     );
 };
 
+const Modal = ({ open, onClose, children }) => {
+    if (!open) return null;
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+            <div className="bg-white dark:bg-[#2a2139] rounded-xl shadow-lg p-8 min-w-[320px] max-w-lg w-full relative">
+                <button onClick={onClose} className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 dark:hover:text-white text-2xl">&times;</button>
+                {children}
+            </div>
+        </div>
+    );
+};
+
 const IotDevicesPage = () => {
     const [devices, setDevices] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [showModal, setShowModal] = useState(false);
+
+    const reloadDevices = async () => {
+        try {
+            setIsLoading(true);
+            setError(null);
+            const deviceList = await getUserDevices();
+            setDevices(deviceList);
+        } catch (err) {
+            setError('디바이스 목록을 불러오는데 실패했습니다.');
+            console.error('디바이스 로드 오류:', err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const loadDevices = async () => {
-            try {
-                setIsLoading(true);
-                setError(null);
-                const deviceList = await getUserDevices();
-                setDevices(deviceList);
-            } catch (err) {
-                setError('디바이스 목록을 불러오는데 실패했습니다.');
-                console.error('디바이스 로드 오류:', err);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        loadDevices();
+        reloadDevices();
     }, []);
+
+    const handleOpenModal = () => setShowModal(true);
+    const handleCloseModal = () => setShowModal(false);
+    const handleSuccess = () => {
+        setShowModal(false);
+        reloadDevices();
+    };
 
     return (
         <div className="p-6">
             <div className="flex items-center space-x-3 mb-6">
                 <IconBarChart size={32} className="text-purple-600" />
                 <h2 className="text-2xl font-semibold text-gray-800">IoT 디바이스 관리</h2>
+                <button
+                    onClick={handleOpenModal}
+                    className="ml-auto flex items-center px-4 py-2 bg-[#7e57c2] dark:bg-[#9575cd] text-white rounded-lg hover:bg-[#5e35b1] dark:hover:bg-[#b39ddb] transition-colors duration-200"
+                >
+                    <Plus size={18} className="mr-2" /> 디바이스 등록
+                </button>
             </div>
-
+            <Modal open={showModal} onClose={handleCloseModal}>
+                <h3 className="text-xl font-bold mb-4 text-[#3a2e5a] dark:text-[#b39ddb]">디바이스 등록</h3>
+                <DeviceCreateForm onSuccess={handleSuccess} />
+            </Modal>
             {isLoading ? (
                 <div className="flex justify-center items-center h-64">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>

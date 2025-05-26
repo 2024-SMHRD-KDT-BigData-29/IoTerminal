@@ -7,7 +7,7 @@ export const saveWorkflow = async (workflowData) => {
     console.log('워크플로우 저장 시도:', workflowData);
     const token = getCurrentUserToken();
     
-    const response = await fetch(`${API_URL}/workflow/save`, {
+    const response = await fetch(`${API_URL}/workflow`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

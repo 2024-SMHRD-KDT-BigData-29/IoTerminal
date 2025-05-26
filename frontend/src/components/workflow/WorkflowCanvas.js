@@ -123,7 +123,7 @@ const baseStylesheet = [
     } },
 ];
 
-function WorkflowCanvas({ elements, setElements, onCyInit, selectedNodeId }) {
+function WorkflowCanvas({ elements, setElements, onCyInit, selectedNodeId, selectedEdgeId, handleDeleteEdge }) {
     const cyRef = useRef(null);
     const canvasContainerRef = useRef(null);
     const [isEdgeMode, setIsEdgeMode] = useState(false);
@@ -163,6 +163,8 @@ function WorkflowCanvas({ elements, setElements, onCyInit, selectedNodeId }) {
             let label = event.dataTransfer.getData('application/reactflow-nodelabel');
             const nodeConfigString = event.dataTransfer.getData('application/reactflow-nodeconfig');
             let nodeConfig = {};
+            const deviceId = event.dataTransfer.getData('application/reactflow-deviceid');
+            const sensorType = event.dataTransfer.getData('application/reactflow-sensortype');
             
             if (!type) return;
             
@@ -182,13 +184,37 @@ function WorkflowCanvas({ elements, setElements, onCyInit, selectedNodeId }) {
             const modelX = (event.clientX - bounds.left - pan.x) / zoom;
             const modelY = (event.clientY - bounds.top - pan.y) / zoom;
             
+            let nodeId = '';
+            let nodeType = type;
+            if (type === 'Input') {
+                nodeType = 'Sensor';
+            }
+            let deviceIdToUse = deviceId;
+            if (nodeType === 'Device') {
+                if (!deviceIdToUse && label) {
+                    // id에서 deviceId 추출 시도 (예: device-13)
+                    const match = /device-(\d+)/.exec(label);
+                    if (match) {
+                        deviceIdToUse = Number(match[1]);
+                    }
+                }
+            }
+            if (nodeType === 'Device' && deviceIdToUse) {
+                nodeId = `device-${deviceIdToUse}`;
+            } else if (nodeType === 'Sensor') {
+                nodeId = `sensor-${Date.now()}`;
+            } else {
+                nodeId = `${nodeType.toLowerCase().replace(/\s+/g, '-')}_${Date.now()}`;
+            }
             const newNode = {
                 group: 'nodes',
                 data: {
-                    id: `${type.toLowerCase().replace(/\s+/g, '-')}_${Date.now()}`,
+                    id: nodeId,
                     label: label,
-                    type: type,
-                    config: nodeConfig
+                    type: nodeType,
+                    config: nodeConfig,
+                    ...(deviceIdToUse ? { deviceId: Number(deviceIdToUse) } : {}),
+                    ...(sensorType ? { sensorType } : {})
                 },
                 position: { x: modelX, y: modelY }
             };
@@ -289,6 +315,26 @@ function WorkflowCanvas({ elements, setElements, onCyInit, selectedNodeId }) {
         return true;
     });
 
+    useEffect(() => {
+        const cy = cyRef.current;
+        if (!cy) return;
+        // 노드 위치 변경 이벤트 리스너
+        const handler = (evt) => {
+            const node = evt.target;
+            setElements(prevElements =>
+                prevElements.map(el =>
+                    el.group === 'nodes' && el.data.id === node.id()
+                        ? { ...el, position: node.position() }
+                        : el
+                )
+            );
+        };
+        cy.on('position', 'node', handler);
+        return () => {
+            cy.removeListener('position', 'node', handler);
+        };
+    }, [setElements]);
+
     return (
         <div ref={canvasContainerRef} className="w-full h-full relative">
             <CytoscapeComponent
@@ -315,27 +361,14 @@ function WorkflowCanvas({ elements, setElements, onCyInit, selectedNodeId }) {
                     <Link2 size={20} />
                 </button>
                 <button
-                    onClick={() => {
-                        const cy = cyRef.current;
-                        const selectedElements = cy?.elements(':selected');
-                        if (selectedElements && selectedElements.length > 0) {
-                            const selectedIds = selectedElements.map(ele => ele.id());
-                            setElements(prevElements => 
-                                prevElements.filter(el => {
-                                    // 노드: 선택된 id가 아니면 남김
-                                    if (el.group === 'nodes') return !selectedIds.includes(el.data.id);
-                                    // 엣지: source/target이 삭제된 노드가 아니면 남김
-                                    if (el.group === 'edges') {
-                                        return !selectedIds.includes(el.data.source) && !selectedIds.includes(el.data.target);
-                                    }
-                                    return true;
-                                })
-                            );
-                            selectedElements.remove();
-                        }
-                    }}
-                    className="p-2 rounded-full shadow bg-white text-purple-700 hover:bg-purple-100 border border-purple-200 flex items-center justify-center w-10 h-10"
-                    title="선택 항목 삭제"
+                    onClick={() => selectedEdgeId && handleDeleteEdge(selectedEdgeId)}
+                    disabled={!selectedEdgeId}
+                    className={`p-2 rounded-full shadow border border-purple-200 flex items-center justify-center w-10 h-10 transition-colors duration-200 ${
+                        selectedEdgeId
+                            ? 'bg-red-500 text-white hover:bg-red-600'
+                            : 'bg-white text-purple-300 cursor-not-allowed'
+                    }`}
+                    title="선택된 연결 삭제"
                 >
                     <Trash2 size={20} />
                 </button>

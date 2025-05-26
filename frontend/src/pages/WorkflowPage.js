@@ -8,6 +8,7 @@ import PropertyEditor from '../components/workflow/PropertyEditor';
 import { Box, Plus, Save, Trash2, Upload } from 'lucide-react'; // 사용되는 아이콘만
 import { saveWorkflow, getWorkflowList, getWorkflowById, deleteWorkflow } from '../api/workflow';
 import { getCurrentUserData } from '../services/authService';
+import { createSensor } from '../services/sensorService';
 
 function WorkflowPage() {
     const [elements, setElements] = useState([]);
@@ -200,8 +201,89 @@ function WorkflowPage() {
     }, [selectedNode, setElements]); // selectedNode가 바뀔 때 이 함수도 최신 selectedNode를 참조하도록 함
 
     const handleSaveWorkflow = async () => {
-        // TODO: API 호출하여 워크플로우 저장
-        console.log('Saving workflow:', { name: workflowName, elements });
+        if (!workflowName.trim()) {
+            alert('워크플로우 이름을 입력해주세요.');
+            return;
+        }
+        if (!cyRef.current) {
+            alert('캔버스가 초기화되지 않았습니다.');
+            return;
+        }
+        // 모든 노드의 position을 Cytoscape에서 항상 가져와서 저장
+        let nodes = elements.filter(el => el.group === 'nodes').map(node => {
+            const cyNode = cyRef.current.getElementById(node.data.id);
+            if (cyNode && cyNode.position) {
+                return { ...node, position: cyNode.position() };
+            }
+            return node;
+        });
+        const edges = elements.filter(el => el.group === 'edges');
+
+        // === 신규(커스텀) 센서 먼저 등록 ===
+        const sensorNodes = nodes.filter(n => n.data.type === 'Sensor');
+        for (const sensorNode of sensorNodes) {
+            if (!sensorNode.data.sensorId) {
+                // 신규 센서 등록
+                const res = await createSensor({
+                    name: sensorNode.data.label,
+                    type: sensorNode.data.sensorType || 'CUSTOM',
+                    description: sensorNode.data.description || '',
+                    config: sensorNode.data.config || {}
+                });
+                if (res.success && res.sensor_id) {
+                    sensorNode.data.sensorId = res.sensor_id;
+                } else {
+                    alert('센서 등록에 실패했습니다.');
+                    return;
+                }
+            }
+        }
+
+        // === 디바이스-센서 연결 정보 추출 ===
+        const deviceNodes = nodes.filter(n => n.data.type === 'Device');
+        let deviceSensorLinks = [];
+        deviceNodes.forEach(deviceNode => {
+            const connectedSensorIds = edges
+                .filter(e => e.data.source === deviceNode.data.id)
+                .map(e => e.data.target);
+            const connectedSensors = nodes.filter(n =>
+                connectedSensorIds.includes(n.data.id) && n.data.type === 'Sensor'
+            );
+            connectedSensors.forEach(sensorNode => {
+                if (!deviceNode.data.deviceId || !sensorNode.data.sensorId) {
+                    console.error('디바이스/센서 id 누락:', deviceNode, sensorNode);
+                    return;
+                }
+                deviceSensorLinks.push({
+                    device_id: deviceNode.data.deviceId,
+                    sensor_id: sensorNode.data.sensorId,
+                    config: sensorNode.data.config || {}
+                });
+            });
+        });
+
+        const workflowData = {
+            name: workflowName,
+            description: '',
+            nodes: nodes,
+            edges: edges,
+            deviceSensorLinks
+        };
+        try {
+            setIsSaving(true);
+            const response = await saveWorkflow(workflowData);
+            if (response.success) {
+                alert('워크플로우가 저장되었습니다.');
+                navigate('/workflow');
+            } else {
+                throw new Error(response.message || '워크플로우 저장에 실패했습니다.');
+            }
+        } catch (error) {
+            console.error('워크플로우 저장 실패:', error);
+            alert(error.message || '워크플로우 저장에 실패했습니다.');
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const handleClearCanvas = () => {

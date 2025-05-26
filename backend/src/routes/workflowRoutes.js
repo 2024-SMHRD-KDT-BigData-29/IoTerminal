@@ -45,7 +45,10 @@ router.post('/', createWorkflow);
 router.get('/list', getUserWorkflows);
 router.get('/recent', getRecentWorkflows);
 router.get('/:workflowId', getWorkflowById);
-router.put('/:workflowId', updateWorkflow);
+router.put('/:workflowId', (req, res, next) => {
+    console.log('[디버깅] PUT /api/workflow/:workflowId 라우터 진입');
+    next();
+}, updateWorkflow);
 router.delete('/:workflowId', deleteWorkflow);
 
 module.exports = router;
