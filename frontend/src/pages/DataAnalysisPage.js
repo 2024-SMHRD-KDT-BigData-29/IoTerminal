@@ -331,6 +331,53 @@ const DataAnalysisPage = () => {
                     {analysisType === 'events' && '이벤트 로그 분석'}
                     {analysisType === 'performance' && '성능 분석'}
                 </h4>
+                
+                {/* 센서 데이터 분석일 때 연결된 센서 목록 표시 */}
+                {analysisType === 'sensor' && selectedDevice && sensors.length > 0 && (
+                    <div className="mb-6">
+                        <h5 className="text-md font-semibold mb-3 text-gray-700 dark:text-gray-300">
+                            연결된 센서 ({sensors.length}개)
+                        </h5>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                            {sensors.map(sensor => {
+                                const sensorValues = (sensorData[sensor.sensor_id] || []).map(d => d.value);
+                                const latestValue = sensorValues.length > 0 ? sensorValues[sensorValues.length - 1] : null;
+                                const avgValue = sensorValues.length > 0 ? (sensorValues.reduce((a, b) => a + b, 0) / sensorValues.length) : null;
+                                
+                                return (
+                                    <div key={sensor.sensor_id} className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-700">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <h6 className="font-semibold text-blue-800 dark:text-blue-300">{sensor.name}</h6>
+                                            <span className="text-xs bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 px-2 py-1 rounded">
+                                                {sensor.type}
+                                            </span>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2 text-sm">
+                                            <div>
+                                                <p className="text-gray-600 dark:text-gray-400">최신값</p>
+                                                <p className="font-bold text-blue-700 dark:text-blue-300">
+                                                    {latestValue !== null ? latestValue.toFixed(1) : 'N/A'}
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <p className="text-gray-600 dark:text-gray-400">평균값</p>
+                                                <p className="font-bold text-purple-700 dark:text-purple-300">
+                                                    {avgValue !== null ? avgValue.toFixed(1) : 'N/A'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="mt-2">
+                                            <p className="text-xs text-gray-500">
+                                                데이터 포인트: {sensorValues.length}개
+                                            </p>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
                 {loading ? (
                     <div className="flex items-center justify-center h-[400px]">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
@@ -355,20 +402,62 @@ const DataAnalysisPage = () => {
                                 }
                             }
                         }} />}
-                        {analysisType === 'sensor' && <Line data={chartData} options={{
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    position: 'top'
-                                }
-                            },
-                            scales: {
-                                y: {
-                                    beginAtZero: true
-                                }
-                            }
-                        }} />}
+                        {analysisType === 'sensor' && (
+                            sensors.length > 0 ? (
+                                // 센서가 있을 때는 통합 차트 표시
+                                <Line data={{
+                                    labels: chartData.labels,
+                                    datasets: sensors.map((sensor, index) => {
+                                        const sensorValues = (sensorData[sensor.sensor_id] || []).map(d => d.value);
+                                        const colors = [
+                                            'rgba(255, 99, 132, 0.8)',
+                                            'rgba(54, 162, 235, 0.8)',
+                                            'rgba(255, 206, 86, 0.8)',
+                                            'rgba(75, 192, 192, 0.8)',
+                                            'rgba(153, 102, 255, 0.8)',
+                                            'rgba(255, 159, 64, 0.8)'
+                                        ];
+                                        return {
+                                            label: sensor.name,
+                                            data: sensorValues.slice(-20), // 최근 20개 데이터만
+                                            borderColor: colors[index % colors.length],
+                                            backgroundColor: colors[index % colors.length].replace('0.8', '0.1'),
+                                            tension: 0.1,
+                                            fill: false
+                                        };
+                                    })
+                                }} options={{
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: {
+                                        legend: {
+                                            position: 'top'
+                                        }
+                                    },
+                                    scales: {
+                                        y: {
+                                            beginAtZero: true
+                                        }
+                                    }
+                                }} />
+                            ) : (
+                                // 센서가 없을 때는 기본 차트 표시
+                                <Line data={chartData} options={{
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: {
+                                        legend: {
+                                            position: 'top'
+                                        }
+                                    },
+                                    scales: {
+                                        y: {
+                                            beginAtZero: true
+                                        }
+                                    }
+                                }} />
+                            )
+                        )}
                         {analysisType === 'events' && <Bar data={chartData} options={{
                             responsive: true,
                             maintainAspectRatio: false,
@@ -434,137 +523,207 @@ const DataAnalysisPage = () => {
             {/* 센서별 상세 데이터 - 센서 데이터 분석일 때만 표시 */}
             {analysisType === 'sensor' && selectedDevice && sensors.length > 0 && (
                 <div className="grid grid-cols-1 gap-6">
-                    <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">센서별 상세 데이터</h3>
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">센서별 상세 분석</h3>
+                        <div className="text-sm text-gray-500">
+                            총 {sensors.length}개 센서 연결됨
+                        </div>
+                    </div>
                     {sensors.map((sensor, index) => {
                         const chartType = index % 3; // 0: Line, 1: Bar, 2: Doughnut
                         const sensorValues = (sensorData[sensor.sensor_id] || []).map(d => d.value);
+                        const isActive = sensorValues.length > 0;
+                        const latestValue = isActive ? sensorValues[sensorValues.length - 1] : null;
+                        const avgValue = isActive ? (sensorValues.reduce((a, b) => a + b, 0) / sensorValues.length) : null;
+                        const minValue = isActive ? Math.min(...sensorValues) : null;
+                        const maxValue = isActive ? Math.max(...sensorValues) : null;
                         
                         return (
-                            <div key={sensor.sensor_id} className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow">
-                                <h4 className="text-lg font-bold mb-4 text-[#7e57c2]">{sensor.name} ({sensor.type})</h4>
-                                <div className="h-[300px]">
-                                    {chartType === 0 && (
-                                        <Line
-                                            data={{
-                                                labels: (sensorData[sensor.sensor_id] || []).map(d => 
-                                                    new Date(d.timestamp).toLocaleTimeString('ko-KR', { 
-                                                        hour: '2-digit', 
-                                                        minute: '2-digit' 
-                                                    })
-                                                ),
-                                                datasets: [{
-                                                    label: sensor.name,
-                                                    data: sensorValues,
-                                                    borderColor: '#7e57c2',
-                                                    backgroundColor: 'rgba(126, 87, 194, 0.1)',
-                                                    tension: 0.2,
-                                                    fill: true
-                                                }]
-                                            }}
-                                            options={{
-                                                responsive: true,
-                                                maintainAspectRatio: false,
-                                                plugins: {
-                                                    legend: {
-                                                        display: true
-                                                    }
-                                                },
-                                                scales: {
-                                                    y: {
-                                                        beginAtZero: true
-                                                    }
-                                                }
-                                            }}
-                                        />
-                                    )}
-                                    {chartType === 1 && (
-                                        <Bar
-                                            data={{
-                                                labels: (sensorData[sensor.sensor_id] || []).slice(-10).map(d => 
-                                                    new Date(d.timestamp).toLocaleTimeString('ko-KR', { 
-                                                        hour: '2-digit', 
-                                                        minute: '2-digit' 
-                                                    })
-                                                ),
-                                                datasets: [{
-                                                    label: sensor.name,
-                                                    data: sensorValues.slice(-10),
-                                                    backgroundColor: 'rgba(54, 162, 235, 0.6)',
-                                                    borderColor: 'rgba(54, 162, 235, 1)',
-                                                    borderWidth: 1
-                                                }]
-                                            }}
-                                            options={{
-                                                responsive: true,
-                                                maintainAspectRatio: false,
-                                                plugins: {
-                                                    legend: {
-                                                        display: true
-                                                    }
-                                                },
-                                                scales: {
-                                                    y: {
-                                                        beginAtZero: true
-                                                    }
-                                                }
-                                            }}
-                                        />
-                                    )}
-                                    {chartType === 2 && sensorValues.length > 0 && (
-                                        <Doughnut
-                                            data={{
-                                                labels: ['최소값', '평균값', '최대값'],
-                                                datasets: [{
-                                                    data: [
-                                                        Math.min(...sensorValues),
-                                                        sensorValues.reduce((a, b) => a + b, 0) / sensorValues.length,
-                                                        Math.max(...sensorValues)
-                                                    ],
-                                                    backgroundColor: [
-                                                        'rgba(255, 99, 132, 0.6)',
-                                                        'rgba(255, 206, 86, 0.6)',
-                                                        'rgba(75, 192, 192, 0.6)'
-                                                    ],
-                                                    borderColor: [
-                                                        'rgba(255, 99, 132, 1)',
-                                                        'rgba(255, 206, 86, 1)',
-                                                        'rgba(75, 192, 192, 1)'
-                                                    ],
-                                                    borderWidth: 2
-                                                }]
-                                            }}
-                                            options={{
-                                                responsive: true,
-                                                maintainAspectRatio: false,
-                                                plugins: {
-                                                    legend: {
-                                                        position: 'right'
-                                                    }
-                                                }
-                                            }}
-                                        />
+                            <div key={sensor.sensor_id} className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+                                {/* 센서 헤더 */}
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center space-x-3">
+                                        <div className={`w-3 h-3 rounded-full ${isActive ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                                        <h4 className="text-lg font-bold text-[#7e57c2]">{sensor.name}</h4>
+                                        <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2 py-1 rounded">
+                                            {sensor.type}
+                                        </span>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-xs text-gray-500">센서 ID: {sensor.sensor_id}</p>
+                                        <p className={`text-xs font-semibold ${isActive ? 'text-green-600' : 'text-red-600'}`}>
+                                            {isActive ? '활성' : '비활성'}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* 센서 통계 카드 */}
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                                    <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg text-center">
+                                        <p className="text-xs text-blue-600 dark:text-blue-400">최신값</p>
+                                        <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
+                                            {latestValue !== null ? latestValue.toFixed(1) : 'N/A'}
+                                        </p>
+                                    </div>
+                                    <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg text-center">
+                                        <p className="text-xs text-green-600 dark:text-green-400">평균값</p>
+                                        <p className="text-lg font-bold text-green-700 dark:text-green-300">
+                                            {avgValue !== null ? avgValue.toFixed(1) : 'N/A'}
+                                        </p>
+                                    </div>
+                                    <div className="bg-orange-50 dark:bg-orange-900/20 p-3 rounded-lg text-center">
+                                        <p className="text-xs text-orange-600 dark:text-orange-400">최소값</p>
+                                        <p className="text-lg font-bold text-orange-700 dark:text-orange-300">
+                                            {minValue !== null ? minValue.toFixed(1) : 'N/A'}
+                                        </p>
+                                    </div>
+                                    <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-lg text-center">
+                                        <p className="text-xs text-red-600 dark:text-red-400">최대값</p>
+                                        <p className="text-lg font-bold text-red-700 dark:text-red-300">
+                                            {maxValue !== null ? maxValue.toFixed(1) : 'N/A'}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* 차트 영역 */}
+                                <div className="h-[300px] mb-4">
+                                    {!isActive ? (
+                                        <div className="flex items-center justify-center h-full bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                            <div className="text-center">
+                                                <div className="text-gray-400 mb-2">📊</div>
+                                                <p className="text-gray-500">센서 데이터가 없습니다</p>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            {chartType === 0 && (
+                                                <Line
+                                                    data={{
+                                                        labels: (sensorData[sensor.sensor_id] || []).map(d => 
+                                                            new Date(d.timestamp).toLocaleTimeString('ko-KR', { 
+                                                                hour: '2-digit', 
+                                                                minute: '2-digit' 
+                                                            })
+                                                        ),
+                                                        datasets: [{
+                                                            label: sensor.name,
+                                                            data: sensorValues,
+                                                            borderColor: '#7e57c2',
+                                                            backgroundColor: 'rgba(126, 87, 194, 0.1)',
+                                                            tension: 0.2,
+                                                            fill: true,
+                                                            pointBackgroundColor: '#7e57c2',
+                                                            pointBorderColor: '#fff',
+                                                            pointBorderWidth: 2,
+                                                            pointRadius: 4
+                                                        }]
+                                                    }}
+                                                    options={{
+                                                        responsive: true,
+                                                        maintainAspectRatio: false,
+                                                        plugins: {
+                                                            legend: {
+                                                                display: true,
+                                                                position: 'top'
+                                                            }
+                                                        },
+                                                        scales: {
+                                                            y: {
+                                                                beginAtZero: true,
+                                                                grid: {
+                                                                    color: 'rgba(0, 0, 0, 0.1)'
+                                                                }
+                                                            },
+                                                            x: {
+                                                                grid: {
+                                                                    color: 'rgba(0, 0, 0, 0.1)'
+                                                                }
+                                                            }
+                                                        }
+                                                    }}
+                                                />
+                                            )}
+                                            {chartType === 1 && (
+                                                <Bar
+                                                    data={{
+                                                        labels: (sensorData[sensor.sensor_id] || []).slice(-10).map(d => 
+                                                            new Date(d.timestamp).toLocaleTimeString('ko-KR', { 
+                                                                hour: '2-digit', 
+                                                                minute: '2-digit' 
+                                                            })
+                                                        ),
+                                                        datasets: [{
+                                                            label: sensor.name,
+                                                            data: sensorValues.slice(-10),
+                                                            backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                                                            borderColor: 'rgba(54, 162, 235, 1)',
+                                                            borderWidth: 1,
+                                                            borderRadius: 4
+                                                        }]
+                                                    }}
+                                                    options={{
+                                                        responsive: true,
+                                                        maintainAspectRatio: false,
+                                                        plugins: {
+                                                            legend: {
+                                                                display: true,
+                                                                position: 'top'
+                                                            }
+                                                        },
+                                                        scales: {
+                                                            y: {
+                                                                beginAtZero: true,
+                                                                grid: {
+                                                                    color: 'rgba(0, 0, 0, 0.1)'
+                                                                }
+                                                            },
+                                                            x: {
+                                                                grid: {
+                                                                    color: 'rgba(0, 0, 0, 0.1)'
+                                                                }
+                                                            }
+                                                        }
+                                                    }}
+                                                />
+                                            )}
+                                            {chartType === 2 && (
+                                                <Doughnut
+                                                    data={{
+                                                        labels: ['최소값', '평균값', '최대값'],
+                                                        datasets: [{
+                                                            data: [minValue, avgValue, maxValue],
+                                                            backgroundColor: [
+                                                                'rgba(255, 99, 132, 0.8)',
+                                                                'rgba(255, 206, 86, 0.8)',
+                                                                'rgba(75, 192, 192, 0.8)'
+                                                            ],
+                                                            borderColor: [
+                                                                'rgba(255, 99, 132, 1)',
+                                                                'rgba(255, 206, 86, 1)',
+                                                                'rgba(75, 192, 192, 1)'
+                                                            ],
+                                                            borderWidth: 2
+                                                        }]
+                                                    }}
+                                                    options={{
+                                                        responsive: true,
+                                                        maintainAspectRatio: false,
+                                                        plugins: {
+                                                            legend: {
+                                                                position: 'right'
+                                                            }
+                                                        }
+                                                    }}
+                                                />
+                                            )}
+                                        </>
                                     )}
                                 </div>
-                                {/* 센서 통계 정보 */}
-                                <div className="mt-4 grid grid-cols-3 gap-4">
-                                    <div className="text-center">
-                                        <p className="text-sm text-gray-500">최신값</p>
-                                        <p className="text-lg font-bold text-blue-600">
-                                            {sensorValues.length > 0 ? sensorValues[sensorValues.length - 1].toFixed(1) : 'N/A'}
-                                        </p>
-                                    </div>
-                                    <div className="text-center">
-                                        <p className="text-sm text-gray-500">평균값</p>
-                                        <p className="text-lg font-bold text-green-600">
-                                            {sensorValues.length > 0 ? (sensorValues.reduce((a, b) => a + b, 0) / sensorValues.length).toFixed(1) : 'N/A'}
-                                        </p>
-                                    </div>
-                                    <div className="text-center">
-                                        <p className="text-sm text-gray-500">최대값</p>
-                                        <p className="text-lg font-bold text-red-600">
-                                            {sensorValues.length > 0 ? Math.max(...sensorValues).toFixed(1) : 'N/A'}
-                                        </p>
-                                    </div>
+
+                                {/* 추가 정보 */}
+                                <div className="flex items-center justify-between text-sm text-gray-500">
+                                    <span>데이터 포인트: {sensorValues.length}개</span>
+                                    <span>차트 타입: {chartType === 0 ? 'Line' : chartType === 1 ? 'Bar' : 'Doughnut'}</span>
                                 </div>
                             </div>
                         );
@@ -577,25 +736,79 @@ const DataAnalysisPage = () => {
                 <div className="mt-6 bg-white dark:bg-gray-800 p-6 rounded-xl shadow">
                     <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4">센서 데이터 요약</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {/* 온도 센서 */}
                         <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
                             <h4 className="font-semibold text-blue-700 dark:text-blue-300 mb-2">온도 센서</h4>
-                            <p className="text-2xl font-bold text-blue-800 dark:text-blue-200">23.5°C</p>
-                            <p className="text-sm text-blue-600">정상 범위</p>
+                            {(() => {
+                                const tempSensor = sensors.find(s => s.name.includes('온도') || s.type.includes('temperature'));
+                                const tempData = tempSensor ? sensorData[tempSensor.sensor_id] : null;
+                                const latestTemp = tempData && tempData.length > 0 ? tempData[tempData.length - 1].value : null;
+                                return (
+                                    <>
+                                        <p className="text-2xl font-bold text-blue-800 dark:text-blue-200">
+                                            {latestTemp !== null ? `${latestTemp.toFixed(1)}°C` : '23.5°C'}
+                                        </p>
+                                        <p className="text-sm text-blue-600">
+                                            {latestTemp !== null ? (latestTemp >= 20 && latestTemp <= 30 ? '정상 범위' : '범위 벗어남') : '정상 범위'}
+                                        </p>
+                                    </>
+                                );
+                            })()}
                         </div>
+                        
+                        {/* 습도 센서 */}
                         <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
                             <h4 className="font-semibold text-green-700 dark:text-green-300 mb-2">습도 센서</h4>
-                            <p className="text-2xl font-bold text-green-800 dark:text-green-200">65%</p>
-                            <p className="text-sm text-green-600">적정 습도</p>
+                            {(() => {
+                                const humiditySensor = sensors.find(s => s.name.includes('습도') || s.type.includes('humidity'));
+                                const humidityData = humiditySensor ? sensorData[humiditySensor.sensor_id] : null;
+                                const latestHumidity = humidityData && humidityData.length > 0 ? humidityData[humidityData.length - 1].value : null;
+                                return (
+                                    <>
+                                        <p className="text-2xl font-bold text-green-800 dark:text-green-200">
+                                            {latestHumidity !== null ? `${latestHumidity.toFixed(1)}%` : '65%'}
+                                        </p>
+                                        <p className="text-sm text-green-600">
+                                            {latestHumidity !== null ? (latestHumidity >= 40 && latestHumidity <= 70 ? '적정 습도' : '습도 조절 필요') : '적정 습도'}
+                                        </p>
+                                    </>
+                                );
+                            })()}
                         </div>
+                        
+                        {/* 가스 센서 */}
                         <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg">
                             <h4 className="font-semibold text-yellow-700 dark:text-yellow-300 mb-2">가스 센서</h4>
-                            <p className="text-2xl font-bold text-yellow-800 dark:text-yellow-200">0.02ppm</p>
-                            <p className="text-sm text-yellow-600">안전 수준</p>
+                            {(() => {
+                                const gasSensor = sensors.find(s => s.name.includes('메탄') || s.name.includes('가스') || s.type.includes('gas'));
+                                const gasData = gasSensor ? sensorData[gasSensor.sensor_id] : null;
+                                const latestGas = gasData && gasData.length > 0 ? gasData[gasData.length - 1].value : null;
+                                return (
+                                    <>
+                                        <p className="text-2xl font-bold text-yellow-800 dark:text-yellow-200">
+                                            {latestGas !== null ? `${latestGas.toFixed(2)}ppm` : '0.02ppm'}
+                                        </p>
+                                        <p className="text-sm text-yellow-600">
+                                            {latestGas !== null ? (latestGas < 1.0 ? '안전 수준' : '주의 필요') : '안전 수준'}
+                                        </p>
+                                    </>
+                                );
+                            })()}
                         </div>
+                        
+                        {/* 연결 상태 */}
                         <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
                             <h4 className="font-semibold text-purple-700 dark:text-purple-300 mb-2">연결 상태</h4>
                             <p className="text-2xl font-bold text-purple-800 dark:text-purple-200">{sensors.length}개</p>
-                            <p className="text-sm text-purple-600">센서 연결됨</p>
+                            <p className="text-sm text-purple-600">
+                                {(() => {
+                                    const activeSensors = sensors.filter(sensor => {
+                                        const data = sensorData[sensor.sensor_id];
+                                        return data && data.length > 0;
+                                    }).length;
+                                    return `${activeSensors}개 활성, ${sensors.length - activeSensors}개 비활성`;
+                                })()}
+                            </p>
                         </div>
                     </div>
                 </div>
