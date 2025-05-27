@@ -302,9 +302,9 @@ function generateSensorMockData(startDate, endDate) {
     
     // 센서 타입별 기본값 설정
     const sensorTypes = [
-        { name: 'gas_methane', min: 0.01, max: 0.5, unit: 'ppm' },
-        { name: 'gas_h2s', min: 0.02, max: 0.8, unit: 'ppm' },
-        { name: 'gas_nh3', min: 0.05, max: 1.2, unit: 'ppm' }
+        { name: 'gas_methane', min: 15, max: 35, unit: 'ppm' },
+        { name: 'gas_h2s', min: 20, max: 45, unit: 'ppm' },
+        { name: 'gas_nh3', min: 10, max: 25, unit: 'ppm' }
     ];
     
     // 현재 시간에서 역순으로 데이터 생성 (최신 데이터가 마지막에 오도록)
@@ -345,7 +345,7 @@ function generateSensorMockData(startDate, endDate) {
             data.push({
                 timestamp: timestamp.toISOString(),
                 sensorType: sensorType.name,
-                value: parseFloat(value.toFixed(3)),
+                value: parseFloat(value.toFixed(1)),
                 unit: sensorType.unit
             });
         });

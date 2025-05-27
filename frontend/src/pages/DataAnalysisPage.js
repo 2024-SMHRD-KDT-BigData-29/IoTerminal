@@ -104,14 +104,14 @@ const DataAnalysisPage = () => {
                 intervalMs = 30 * 1000; // 30초 (기본값)
         }
         
-        // 센서 타입에 따른 값 범위 설정
-        let valueRange = { min: 0.01, max: 0.5 };
+        // 센서 타입에 따른 값 범위 설정 (대시보드와 동일한 ppm 단위)
+        let valueRange = { min: 15, max: 35 };
         if (sensorName.includes('메탄') || sensorName.includes('MQ4') || sensorType.includes('gas')) {
-            valueRange = { min: 0.01, max: 0.5 };
+            valueRange = { min: 15, max: 35 }; // 메탄 가스 ppm
         } else if (sensorName.includes('황화수소') || sensorName.includes('MQ136')) {
-            valueRange = { min: 0.02, max: 0.8 };
+            valueRange = { min: 20, max: 45 }; // 황화수소 ppm
         } else if (sensorName.includes('암모니아') || sensorName.includes('MQ137')) {
-            valueRange = { min: 0.05, max: 1.2 };
+            valueRange = { min: 10, max: 25 }; // 암모니아 ppm
         }
         
         for (let i = 0; i < dataPoints; i++) {
@@ -144,7 +144,7 @@ const DataAnalysisPage = () => {
             
             data.push({
                 timestamp: timestamp.toISOString(),
-                value: parseFloat(value.toFixed(3))
+                value: parseFloat(value.toFixed(1)) // ppm 단위로 소수점 1자리
             });
         }
         
@@ -453,18 +453,18 @@ const DataAnalysisPage = () => {
             
             console.log('실시간 업데이트 - 현재 시간:', koreaTime.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }));
             
-            // 센서 타입에 따른 값 범위 설정
-            let valueRange = { min: 0.01, max: 0.5 };
+            // 센서 타입에 따른 값 범위 설정 (대시보드와 동일한 ppm 단위)
+            let valueRange = { min: 15, max: 35 };
             if (sensorName.includes('메탄') || sensorName.includes('MQ4') || sensorType.includes('gas')) {
-                valueRange = { min: 0.01, max: 0.5 };
+                valueRange = { min: 15, max: 35 }; // 메탄 가스 ppm
             } else if (sensorName.includes('황화수소') || sensorName.includes('MQ136')) {
-                valueRange = { min: 0.02, max: 0.8 };
+                valueRange = { min: 20, max: 45 }; // 황화수소 ppm
             } else if (sensorName.includes('암모니아') || sensorName.includes('MQ137')) {
-                valueRange = { min: 0.05, max: 1.2 };
+                valueRange = { min: 10, max: 25 }; // 암모니아 ppm
             } else if (sensorName.includes('온도') || sensorType.includes('temperature')) {
-                valueRange = { min: 18, max: 28 };
+                valueRange = { min: 18, max: 28 }; // 온도 (°C)
             } else if (sensorName.includes('습도') || sensorType.includes('humidity')) {
-                valueRange = { min: 40, max: 80 };
+                valueRange = { min: 40, max: 80 }; // 습도 (%)
             }
             
             // 이전 값을 기준으로 자연스러운 변화 생성
@@ -485,7 +485,7 @@ const DataAnalysisPage = () => {
             
             const newDataPoint = {
                 timestamp: koreaTime.toISOString(),
-                value: parseFloat(newValue.toFixed(3))
+                value: parseFloat(newValue.toFixed(1)) // ppm 단위로 소수점 1자리
             };
             
             // 최근 50개 데이터만 유지 (오래된 데이터 제거)
@@ -654,13 +654,13 @@ const DataAnalysisPage = () => {
                                             <div>
                                                 <p className="text-gray-600 dark:text-gray-400">최신값</p>
                                                 <p className="font-bold text-blue-700 dark:text-blue-300">
-                                                    {latestValue !== null ? latestValue.toFixed(3) : 'N/A'}
+                                                    {latestValue !== null ? `${latestValue.toFixed(1)} ppm` : 'N/A'}
                                                 </p>
                                             </div>
                                             <div>
                                                 <p className="text-gray-600 dark:text-gray-400">평균값</p>
                                                 <p className="font-bold text-purple-700 dark:text-purple-300">
-                                                    {avgValue !== null ? avgValue.toFixed(3) : 'N/A'}
+                                                    {avgValue !== null ? `${avgValue.toFixed(1)} ppm` : 'N/A'}
                                                 </p>
                                             </div>
                                         </div>
