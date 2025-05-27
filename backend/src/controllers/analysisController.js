@@ -123,13 +123,71 @@ function generateUsageData(startDate, endDate) {
     const data = [];
     const start = new Date(startDate || Date.now() - 24 * 60 * 60 * 1000);
     const end = new Date(endDate || Date.now());
-    const interval = (end - start) / 20; // 20개 데이터 포인트
+    const timeDiff = end - start;
     
-    for (let i = 0; i < 20; i++) {
-        const timestamp = new Date(start.getTime() + i * interval);
+    // 시간 범위에 따른 데이터 포인트 수와 간격 결정
+    let dataPoints, intervalMs;
+    
+    if (timeDiff <= 24 * 60 * 60 * 1000) {
+        // 24시간 이하: 1시간 간격으로 24개 포인트
+        dataPoints = 24;
+        intervalMs = (24 * 60 * 60 * 1000) / dataPoints; // 정확히 1시간 간격
+    } else if (timeDiff <= 7 * 24 * 60 * 60 * 1000) {
+        // 7일 이하: 4시간 간격으로 42개 포인트
+        dataPoints = 42;
+        intervalMs = (7 * 24 * 60 * 60 * 1000) / dataPoints; // 정확히 4시간 간격
+    } else if (timeDiff <= 30 * 24 * 60 * 60 * 1000) {
+        // 30일 이하: 12시간 간격으로 60개 포인트
+        dataPoints = 60;
+        intervalMs = (30 * 24 * 60 * 60 * 1000) / dataPoints; // 정확히 12시간 간격
+    } else {
+        // 1년: 3일 간격으로 120개 포인트
+        dataPoints = 120;
+        intervalMs = (365 * 24 * 60 * 60 * 1000) / dataPoints; // 정확히 3일 간격
+    }
+    
+    // 현재 시간에서 역순으로 데이터 생성 (최신 데이터가 마지막에 오도록)
+    const now = new Date();
+    const koreaTime = new Date(now.getTime() + (9 * 60 * 60 * 1000)); // UTC + 9시간
+    
+    for (let i = 0; i < dataPoints; i++) {
+        // 현재 시간에서 역순으로 계산
+        const timestamp = new Date(koreaTime.getTime() - ((dataPoints - 1 - i) * intervalMs));
+        
+        // 시간대별 변화 패턴 적용 (낮에 사용량이 높고 밤에 낮음)
+        const hour = timestamp.getHours();
+        const timeOfDayFactor = 0.6 + 0.8 * Math.sin((hour - 6) * Math.PI / 12);
+        
+        // 요일별 변화 (주말에는 사용량이 적음)
+        const dayOfWeek = timestamp.getDay();
+        const weekendFactor = (dayOfWeek === 0 || dayOfWeek === 6) ? 0.7 : 1.0;
+        
+        // 계절별 변화 (월별로 조정)
+        const month = timestamp.getMonth();
+        const seasonalFactor = 0.8 + 0.4 * Math.sin((month - 2) * Math.PI / 6);
+        
+        // 기간에 따른 기본 사용량 조정
+        let baseUsage;
+        if (timeDiff <= 24 * 60 * 60 * 1000) {
+            // 24시간: 시간별 세밀한 변화
+            baseUsage = 70 + Math.random() * 60; // 70-130 사이
+        } else if (timeDiff <= 7 * 24 * 60 * 60 * 1000) {
+            // 7일: 일별 변화
+            baseUsage = 80 + Math.random() * 80; // 80-160 사이
+        } else if (timeDiff <= 30 * 24 * 60 * 60 * 1000) {
+            // 30일: 주별 변화
+            baseUsage = 90 + Math.random() * 100; // 90-190 사이
+        } else {
+            // 1년: 월별 변화
+            baseUsage = 100 + Math.random() * 120; // 100-220 사이
+        }
+        
+        // 모든 팩터 적용
+        const finalUsage = Math.floor(baseUsage * timeOfDayFactor * weekendFactor * seasonalFactor);
+        
         data.push({
             timestamp: timestamp.toISOString(),
-            value: Math.floor(Math.random() * 100) + 50 // 50-150 사이의 사용량
+            value: Math.max(10, finalUsage) // 최소 10 이상
         });
     }
     

@@ -123,7 +123,7 @@ const baseStylesheet = [
     } },
 ];
 
-function WorkflowCanvas({ elements, setElements, onCyInit, selectedNodeId, selectedEdgeId, handleDeleteEdge }) {
+function WorkflowCanvas({ elements, setElements, onCyInit, selectedNodeId, selectedEdgeId, handleDeleteEdge, handleDeleteNode }) {
     const cyRef = useRef(null);
     const canvasContainerRef = useRef(null);
     const [isEdgeMode, setIsEdgeMode] = useState(false);
@@ -335,6 +335,25 @@ function WorkflowCanvas({ elements, setElements, onCyInit, selectedNodeId, selec
         };
     }, [setElements]);
 
+    // 키보드 이벤트 처리 (Delete 키로 삭제)
+    useEffect(() => {
+        const handleKeyDown = (event) => {
+            if (event.key === 'Delete' || event.key === 'Backspace') {
+                event.preventDefault();
+                if (selectedNodeId && handleDeleteNode) {
+                    handleDeleteNode(selectedNodeId);
+                } else if (selectedEdgeId && handleDeleteEdge) {
+                    handleDeleteEdge(selectedEdgeId);
+                }
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [selectedNodeId, selectedEdgeId, handleDeleteNode, handleDeleteEdge]);
+
     return (
         <div ref={canvasContainerRef} className="w-full h-full relative">
             <CytoscapeComponent
@@ -359,6 +378,18 @@ function WorkflowCanvas({ elements, setElements, onCyInit, selectedNodeId, selec
                     title="엣지 연결 모드"
                 >
                     <Link2 size={20} />
+                </button>
+                <button
+                    onClick={() => selectedNodeId && handleDeleteNode(selectedNodeId)}
+                    disabled={!selectedNodeId}
+                    className={`p-2 rounded-full shadow border border-purple-200 flex items-center justify-center w-10 h-10 transition-colors duration-200 ${
+                        selectedNodeId
+                            ? 'bg-orange-500 text-white hover:bg-orange-600'
+                            : 'bg-white text-purple-300 cursor-not-allowed'
+                    }`}
+                    title="선택된 노드 삭제"
+                >
+                    <Trash2 size={20} />
                 </button>
                 <button
                     onClick={() => selectedEdgeId && handleDeleteEdge(selectedEdgeId)}

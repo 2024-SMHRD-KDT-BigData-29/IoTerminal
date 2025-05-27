@@ -400,6 +400,32 @@ const WorkflowCanvasPage = () => {
         setSelectedEdgeId(null); // 삭제 후 선택 해제
     };
 
+    // 노드 삭제 함수
+    const handleDeleteNode = (nodeId) => {
+        console.log('[노드삭제] 삭제 요청된 nodeId:', nodeId);
+        setElements(prevElements => {
+            // 노드와 연결된 모든 엣지도 함께 삭제
+            const newElements = prevElements.filter(
+                el => {
+                    // 노드 자체 삭제
+                    if (el.group === 'nodes' && el.data.id === nodeId) {
+                        return false;
+                    }
+                    // 해당 노드와 연결된 엣지 삭제
+                    if (el.group === 'edges' && (el.data.source === nodeId || el.data.target === nodeId)) {
+                        return false;
+                    }
+                    return true;
+                }
+            );
+            elementsRef.current = newElements; // 삭제 후 바로 최신 상태로 갱신
+            console.log('[노드삭제] 삭제 후 elements 길이:', newElements.length);
+            return newElements;
+        });
+        setSelectedNode(null); // 삭제 후 선택 해제
+        setSelectedEdgeId(null); // 연결된 엣지도 삭제되므로 엣지 선택도 해제
+    };
+
     return (
         <div className="h-[calc(100vh-80px)] min-h-[600px] flex flex-col">
             {/* 상단 툴바 */}
@@ -458,6 +484,7 @@ const WorkflowCanvasPage = () => {
                         selectedNodeId={selectedNode?.id}
                         selectedEdgeId={selectedEdgeId}
                         handleDeleteEdge={handleDeleteEdge}
+                        handleDeleteNode={handleDeleteNode}
                     />
                 </div>
 

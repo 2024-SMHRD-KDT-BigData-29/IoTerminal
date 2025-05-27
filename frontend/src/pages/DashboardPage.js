@@ -552,7 +552,7 @@ function DashboardPage() {
                 <div className="flex justify-between items-center mb-2">
                     <h3 className="text-base font-semibold text-gray-700 dark:text-gray-200">최근 워크플로우</h3>
                     <Link to="/workflow" className="text-xs font-medium text-purple-600 dark:text-purple-400 hover:underline">
-                        전체 보기 및 새로 만들기
+                        전체 보기
                     </Link>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
