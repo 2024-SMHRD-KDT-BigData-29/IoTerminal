@@ -1,7 +1,7 @@
 export const getDashboardSummary = async () => {
     return Promise.resolve({
-        activeSensors: 3,
-        dataCollected: "1,200",
+        activeSensors: 8,
+        dataCollected: "128",
         errorRate: "0.5%",
         apiCalls: "0"
     });

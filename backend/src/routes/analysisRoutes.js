@@ -11,7 +11,4 @@ router.get('/sensor/:deviceId', analysisController.getDeviceSensorData);
 // 이벤트 로그 분석
 router.get('/events/:deviceId', analysisController.getDeviceEventLogs);
 
-// 성능 분석
-router.get('/performance/:deviceId', analysisController.getDevicePerformanceStats);
-
 module.exports = router; 

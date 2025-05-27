@@ -118,31 +118,6 @@ exports.getDeviceEventLogs = async (req, res) => {
     }
 };
 
-// 성능 분석 조회
-exports.getDevicePerformanceStats = async (req, res) => {
-    try {
-        const { deviceId } = req.params;
-        const { startDate, endDate } = req.query;
-        
-        console.log('성능 분석 요청:', { deviceId, startDate, endDate });
-        
-        // 모의 성능 데이터 생성
-        const mockData = generatePerformanceData(startDate, endDate);
-        
-        res.json({
-            success: true,
-            label: '디바이스 성능 지수',
-            data: mockData
-        });
-    } catch (error) {
-        console.error('성능 분석 오류:', error);
-        res.status(500).json({
-            success: false,
-            message: '성능 분석 중 오류가 발생했습니다.'
-        });
-    }
-};
-
 // 모의 데이터 생성 함수들
 function generateUsageData(startDate, endDate) {
     const data = [];
@@ -163,32 +138,73 @@ function generateUsageData(startDate, endDate) {
 
 function generateEventLogData(startDate, endDate) {
     const data = [];
-    const start = new Date(startDate || Date.now() - 24 * 60 * 60 * 1000);
+    const start = new Date(startDate || Date.now() - 7 * 24 * 60 * 60 * 1000); // 기본 7일
     const end = new Date(endDate || Date.now());
-    const interval = (end - start) / 15; // 15개 데이터 포인트
+    const timeDiff = end - start;
     
-    for (let i = 0; i < 15; i++) {
-        const timestamp = new Date(start.getTime() + i * interval);
-        data.push({
-            timestamp: timestamp.toISOString(),
-            value: Math.floor(Math.random() * 20) + 1 // 1-20 사이의 이벤트 수
-        });
+    // 기간에 따른 날짜 수 결정
+    let dayCount;
+    if (timeDiff <= 24 * 60 * 60 * 1000) {
+        // 24시간 이하: 1일
+        dayCount = 1;
+    } else if (timeDiff <= 7 * 24 * 60 * 60 * 1000) {
+        // 7일 이하: 7일
+        dayCount = 7;
+    } else if (timeDiff <= 30 * 24 * 60 * 60 * 1000) {
+        // 30일 이하: 30일
+        dayCount = 30;
+    } else {
+        // 1년: 365일
+        dayCount = 365;
     }
     
-    return data;
-}
-
-function generatePerformanceData(startDate, endDate) {
-    const data = [];
-    const start = new Date(startDate || Date.now() - 24 * 60 * 60 * 1000);
-    const end = new Date(endDate || Date.now());
-    const interval = (end - start) / 25; // 25개 데이터 포인트
+    // 날짜별로 데이터 생성 (하루 단위)
+    const currentDate = new Date(end);
+    const eventTypes = [
+        { name: '센서 알림', weight: 0.4, color: 'rgba(255, 99, 132, 0.8)' },
+        { name: '시스템 경고', weight: 0.3, color: 'rgba(54, 162, 235, 0.8)' },
+        { name: '연결 오류', weight: 0.2, color: 'rgba(255, 206, 86, 0.8)' },
+        { name: '데이터 이상', weight: 0.1, color: 'rgba(75, 192, 192, 0.8)' }
+    ];
     
-    for (let i = 0; i < 25; i++) {
-        const timestamp = new Date(start.getTime() + i * interval);
-        data.push({
-            timestamp: timestamp.toISOString(),
-            value: Math.floor(Math.random() * 40) + 60 // 60-100 사이의 성능 지수
+    for (let i = 0; i < dayCount; i++) {
+        const targetDate = new Date(currentDate.getTime() - (i * 24 * 60 * 60 * 1000));
+        const dateStr = targetDate.toISOString().split('T')[0]; // YYYY-MM-DD 형식
+        
+        // 각 이벤트 타입별로 발생 횟수 생성
+        eventTypes.forEach(eventType => {
+            // 요일에 따른 가중치 (주말에는 이벤트가 적음)
+            const dayOfWeek = targetDate.getDay();
+            const weekendFactor = (dayOfWeek === 0 || dayOfWeek === 6) ? 0.5 : 1.0;
+            
+            // 기간에 따른 기본 이벤트 수 조정
+            let baseEventCount;
+            if (dayCount === 1) {
+                // 24시간: 시간당 이벤트로 계산 (24개 데이터 포인트)
+                baseEventCount = Math.floor(Math.random() * 3) + 1; // 1-3개
+            } else if (dayCount <= 7) {
+                // 7일: 일당 적당한 이벤트 수
+                baseEventCount = Math.floor(Math.random() * 15) + 5; // 5-19개
+            } else if (dayCount <= 30) {
+                // 30일: 일당 더 많은 이벤트
+                baseEventCount = Math.floor(Math.random() * 25) + 10; // 10-34개
+            } else {
+                // 1년: 일당 많은 이벤트
+                baseEventCount = Math.floor(Math.random() * 40) + 15; // 15-54개
+            }
+            
+            // 이벤트 타입 가중치와 주말 팩터 적용
+            const adjustedCount = Math.floor(baseEventCount * eventType.weight * weekendFactor);
+            
+            if (adjustedCount > 0) {
+                data.push({
+                    timestamp: targetDate.toISOString(),
+                    date: dateStr,
+                    eventType: eventType.name,
+                    value: adjustedCount,
+                    color: eventType.color
+                });
+            }
         });
     }
     
@@ -199,13 +215,81 @@ function generateSensorMockData(startDate, endDate) {
     const data = [];
     const start = new Date(startDate || Date.now() - 24 * 60 * 60 * 1000);
     const end = new Date(endDate || Date.now());
-    const interval = (end - start) / 30; // 30개 데이터 포인트
+    const timeDiff = end - start;
     
-    for (let i = 0; i < 30; i++) {
-        const timestamp = new Date(start.getTime() + i * interval);
-        data.push({
-            timestamp: timestamp.toISOString(),
-            value: Math.floor(Math.random() * 15) + 20 // 20-35 사이의 온도값
+    // 시간 범위에 따른 데이터 포인트 수와 간격 결정
+    let dataPoints, intervalMs, label;
+    
+    if (timeDiff <= 24 * 60 * 60 * 1000) {
+        // 24시간 이하: 30분 간격으로 48개 포인트
+        dataPoints = 48;
+        intervalMs = (24 * 60 * 60 * 1000) / dataPoints; // 정확히 30분 간격
+        label = '시간별 센서 데이터';
+    } else if (timeDiff <= 7 * 24 * 60 * 60 * 1000) {
+        // 7일 이하: 2시간 간격으로 84개 포인트
+        dataPoints = 84;
+        intervalMs = (7 * 24 * 60 * 60 * 1000) / dataPoints; // 정확히 2시간 간격
+        label = '시간별 센서 데이터 (7일)';
+    } else if (timeDiff <= 30 * 24 * 60 * 60 * 1000) {
+        // 30일 이하: 6시간 간격으로 120개 포인트
+        dataPoints = 120;
+        intervalMs = (30 * 24 * 60 * 60 * 1000) / dataPoints; // 정확히 6시간 간격
+        label = '일별 센서 데이터 (30일)';
+    } else {
+        // 1년: 1일 간격으로 365개 포인트
+        dataPoints = 365;
+        intervalMs = (365 * 24 * 60 * 60 * 1000) / dataPoints; // 정확히 1일 간격
+        label = '일별 센서 데이터 (1년)';
+    }
+    
+    // 센서 타입별 기본값 설정
+    const sensorTypes = [
+        { name: 'gas_methane', min: 0.01, max: 0.5, unit: 'ppm' },
+        { name: 'gas_h2s', min: 0.02, max: 0.8, unit: 'ppm' },
+        { name: 'gas_nh3', min: 0.05, max: 1.2, unit: 'ppm' }
+    ];
+    
+    // 현재 시간에서 역순으로 데이터 생성 (최신 데이터가 마지막에 오도록)
+    const now = new Date();
+    const koreaTime = new Date(now.getTime() + (9 * 60 * 60 * 1000)); // UTC + 9시간
+    
+    for (let i = 0; i < dataPoints; i++) {
+        // 현재 시간에서 역순으로 계산
+        const timestamp = new Date(koreaTime.getTime() - ((dataPoints - 1 - i) * intervalMs));
+        
+        // 시간대별 변화 패턴 적용 (온도는 낮에 높고 밤에 낮음)
+        const hour = timestamp.getHours();
+        const timeOfDayFactor = 0.8 + 0.4 * Math.sin((hour - 6) * Math.PI / 12);
+        
+        // 요일별 변화 (주말에는 약간 다른 패턴)
+        const dayOfWeek = timestamp.getDay();
+        const weekendFactor = (dayOfWeek === 0 || dayOfWeek === 6) ? 0.9 : 1.0;
+        
+        // 계절별 변화 (월별로 조정)
+        const month = timestamp.getMonth();
+        const seasonalFactor = 0.7 + 0.6 * Math.sin((month - 2) * Math.PI / 6);
+        
+        sensorTypes.forEach(sensorType => {
+            let baseValue = sensorType.min + (sensorType.max - sensorType.min) * 0.5;
+            let variation = (sensorType.max - sensorType.min) * 0.3;
+            
+            // 센서별 특별한 패턴 적용
+            if (sensorType.name.includes('gas')) {
+                // 가스 센서는 더 불규칙한 패턴
+                variation *= (1 + Math.random() * 0.5);
+                baseValue *= timeOfDayFactor * weekendFactor;
+            }
+            
+            const randomVariation = (Math.random() - 0.5) * variation;
+            const value = Math.max(sensorType.min, 
+                Math.min(sensorType.max, baseValue + randomVariation));
+            
+            data.push({
+                timestamp: timestamp.toISOString(),
+                sensorType: sensorType.name,
+                value: parseFloat(value.toFixed(3)),
+                unit: sensorType.unit
+            });
         });
     }
     

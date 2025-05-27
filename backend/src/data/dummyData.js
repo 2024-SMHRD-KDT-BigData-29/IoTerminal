@@ -38,8 +38,8 @@ let workflows = [
 
 // Simulate active sensors for dashboard summary cards
 const summaryStats = {
-    activeSensors: 32,
-    dataCollected: "1.8M", // as a string
+    activeSensors: 8,
+    dataCollected: "128", // as a string
     errorRate: "2.4%",    // as a string
     apiCalls: "25K"       // as a string
 };

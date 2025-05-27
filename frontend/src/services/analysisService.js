@@ -65,28 +65,16 @@ export const getDeviceEventLogs = async (deviceId, dateRange) => {
 };
 
 /**
- * 디바이스 성능 통계를 가져옵니다.
- * @param {string} deviceId - 디바이스 ID
- * @param {Object} dateRange - 날짜 범위 {startDate, endDate}
- * @returns {Promise<Object>} 성능 통계
+ * 디바이스 성능 통계를 가져옵니다. - 삭제됨
  */
-export const getDevicePerformanceStats = async (deviceId, dateRange) => {
-    try {
-        const params = new URLSearchParams();
-        if (dateRange.startDate) params.append('startDate', dateRange.startDate);
-        if (dateRange.endDate) params.append('endDate', dateRange.endDate);
-        
-        const response = await axios.get(`${API_URL}/analysis/performance/${deviceId}?${params}`);
-        return response.data;
-    } catch (error) {
-        console.error('성능 통계 조회 오류:', error);
-        throw error;
-    }
-};
 
 // 사용 패턴 분석 데이터 가져오기
 export const getUsagePatternData = async (deviceId, dateRange) => {
     try {
+        const params = new URLSearchParams();
+        if (dateRange?.startDate) params.append('startDate', dateRange.startDate);
+        if (dateRange?.endDate) params.append('endDate', dateRange.endDate);
+        
         const response = await axios.get(`${API_URL}/analysis/usage/${deviceId}?${params}`);
 
         const data = response.data;
@@ -117,6 +105,10 @@ export const getUsagePatternData = async (deviceId, dateRange) => {
 // 효율성 분석 데이터 가져오기
 export const getEfficiencyData = async (deviceId, dateRange) => {
     try {
+        const params = new URLSearchParams();
+        if (dateRange?.startDate) params.append('startDate', dateRange.startDate);
+        if (dateRange?.endDate) params.append('endDate', dateRange.endDate);
+        
         const response = await axios.get(`${API_URL}/analysis/efficiency/${deviceId}?${params}`);
 
         const data = response.data;

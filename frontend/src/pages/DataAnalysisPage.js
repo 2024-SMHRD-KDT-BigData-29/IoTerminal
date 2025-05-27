@@ -3,8 +3,7 @@ import { Line, Bar, Pie, Doughnut } from 'react-chartjs-2';
 import { 
     getDeviceUsageData, 
     getDeviceSensorData, 
-    getDeviceEventLogs,
-    getDevicePerformanceStats 
+    getDeviceEventLogs
 } from '../services/analysisService';
 import { getUserDevices, getDeviceSensors } from '../services/deviceService';
 import {
@@ -74,6 +73,36 @@ const DataAnalysisPage = () => {
     const generateMockSensorData = (sensorName, sensorType, count = 20) => {
         const data = [];
         const now = new Date();
+        const koreaTime = new Date(now.getTime() + (9 * 60 * 60 * 1000)); // UTC + 9시간
+        
+        // 현재 선택된 시간 범위에 따른 데이터 포인트 수와 간격 결정
+        let dataPoints, intervalMs;
+        
+        switch (timeRange) {
+            case 'day':
+                // 24시간: 30분 간격으로 48개 포인트
+                dataPoints = 48;
+                intervalMs = (24 * 60 * 60 * 1000) / dataPoints; // 정확히 30분
+                break;
+            case 'week':
+                // 7일: 2시간 간격으로 84개 포인트
+                dataPoints = 84;
+                intervalMs = (7 * 24 * 60 * 60 * 1000) / dataPoints; // 정확히 2시간
+                break;
+            case 'month':
+                // 30일: 6시간 간격으로 120개 포인트
+                dataPoints = 120;
+                intervalMs = (30 * 24 * 60 * 60 * 1000) / dataPoints; // 정확히 6시간
+                break;
+            case 'year':
+                // 1년: 1일 간격으로 365개 포인트
+                dataPoints = 365;
+                intervalMs = (365 * 24 * 60 * 60 * 1000) / dataPoints; // 정확히 1일
+                break;
+            default:
+                dataPoints = count;
+                intervalMs = 30 * 1000; // 30초 (기본값)
+        }
         
         // 센서 타입에 따른 값 범위 설정
         let valueRange = { min: 0.01, max: 0.5 };
@@ -83,23 +112,38 @@ const DataAnalysisPage = () => {
             valueRange = { min: 0.02, max: 0.8 };
         } else if (sensorName.includes('암모니아') || sensorName.includes('MQ137')) {
             valueRange = { min: 0.05, max: 1.2 };
-        } else if (sensorName.includes('온도') || sensorType.includes('temperature')) {
-            valueRange = { min: 18, max: 28 };
-        } else if (sensorName.includes('습도') || sensorType.includes('humidity')) {
-            valueRange = { min: 40, max: 80 };
         }
         
-        for (let i = count - 1; i >= 0; i--) {
-            const timestamp = new Date(now.getTime() - (i * 30 * 1000)); // 30초 간격
-            const koreaTime = new Date(timestamp.getTime() + (9 * 60 * 60 * 1000)); // UTC + 9시간
+        for (let i = 0; i < dataPoints; i++) {
+            // 현재 시간에서 역순으로 계산 (최신 데이터가 마지막에 오도록)
+            const timestamp = new Date(koreaTime.getTime() - ((dataPoints - 1 - i) * intervalMs));
             
-            // 기본값 + 랜덤 변동
-            const baseValue = valueRange.min + (valueRange.max - valueRange.min) * 0.4;
-            const randomVariation = (Math.random() - 0.5) * (valueRange.max - valueRange.min) * 0.4;
+            // 시간대별 변화 패턴 적용
+            const hour = timestamp.getHours();
+            let timeOfDayFactor = 1.0;
+            
+            if (sensorType.includes('gas')) {
+                // 가스 센서는 더 불규칙한 패턴
+                timeOfDayFactor = 0.8 + 0.4 * Math.random();
+            }
+            
+            // 요일별 변화 (주말에는 약간 다른 패턴)
+            const dayOfWeek = timestamp.getDay();
+            const weekendFactor = (dayOfWeek === 0 || dayOfWeek === 6) ? 0.9 : 1.0;
+            
+            // 계절별 변화 (월별로 조정)
+            const month = timestamp.getMonth();
+            let seasonalFactor = 1.0;
+            
+            // 기본값 + 패턴 적용 + 랜덤 변동
+            let baseValue = valueRange.min + (valueRange.max - valueRange.min) * 0.5;
+            baseValue *= timeOfDayFactor * weekendFactor * seasonalFactor;
+            
+            const randomVariation = (Math.random() - 0.5) * (valueRange.max - valueRange.min) * 0.3;
             const value = Math.max(valueRange.min, Math.min(valueRange.max, baseValue + randomVariation));
             
             data.push({
-                timestamp: koreaTime.toISOString(),
+                timestamp: timestamp.toISOString(),
                 value: parseFloat(value.toFixed(3))
             });
         }
@@ -165,7 +209,7 @@ const DataAnalysisPage = () => {
                 setRealTimeInterval(null);
             }
         }
-    }, [selectedDevice, analysisType]);
+    }, [selectedDevice, analysisType, timeRange]);
 
     // 실시간 모드 토글
     const toggleRealTimeMode = () => {
@@ -235,11 +279,6 @@ const DataAnalysisPage = () => {
                         data = await getDeviceEventLogs(selectedDevice, dateRange);
                         console.log('이벤트 로그 분석 응답:', data);
                         break;
-                    case 'performance':
-                        console.log('성능 분석 API 호출 시작');
-                        data = await getDevicePerformanceStats(selectedDevice, dateRange);
-                        console.log('성능 분석 응답:', data);
-                        break;
                     default:
                         throw new Error('지원하지 않는 분석 유형입니다.');
                 }
@@ -288,43 +327,57 @@ const DataAnalysisPage = () => {
     const formatChartData = (data) => {
         if (!data || !data.data) return null;
 
-        // 성능 분석의 경우 파이 차트용 데이터 포맷
-        if (analysisType === 'performance') {
-            const avgValue = data.data.reduce((sum, item) => sum + item.value, 0) / data.data.length;
-            const goodPerformance = data.data.filter(item => item.value >= 80).length;
-            const averagePerformance = data.data.filter(item => item.value >= 60 && item.value < 80).length;
-            const poorPerformance = data.data.filter(item => item.value < 60).length;
-            
-            return {
-                labels: ['우수', '보통', '미흡'],
-                datasets: [{
-                    data: [goodPerformance, averagePerformance, poorPerformance],
-                    backgroundColor: [
-                        'rgba(75, 192, 192, 0.8)',
-                        'rgba(255, 206, 86, 0.8)',
-                        'rgba(255, 99, 132, 0.8)'
-                    ],
-                    borderColor: [
-                        'rgba(75, 192, 192, 1)',
-                        'rgba(255, 206, 86, 1)',
-                        'rgba(255, 99, 132, 1)'
-                    ],
-                    borderWidth: 2
-                }]
-            };
-        }
-
         // 이벤트 로그 분석의 경우 막대 차트용 데이터 포맷
         if (analysisType === 'events') {
+            // 날짜별로 데이터 그룹화
+            const dateGroups = {};
+            const eventTypes = new Set();
+            
+            data.data.forEach(item => {
+                const date = new Date(item.timestamp).toLocaleDateString('ko-KR', { 
+                    month: '2-digit', 
+                    day: '2-digit',
+                    timeZone: 'Asia/Seoul'
+                });
+                
+                if (!dateGroups[date]) {
+                    dateGroups[date] = {};
+                }
+                
+                const eventType = item.eventType || '일반 이벤트';
+                eventTypes.add(eventType);
+                
+                if (!dateGroups[date][eventType]) {
+                    dateGroups[date][eventType] = 0;
+                }
+                dateGroups[date][eventType] += item.value;
+            });
+            
+            // 날짜 라벨 생성
+            const labels = Object.keys(dateGroups).sort();
+            
+            // 이벤트 타입별 색상 매핑
+            const colorMap = {
+                '센서 알림': 'rgba(255, 99, 132, 0.8)',
+                '시스템 경고': 'rgba(54, 162, 235, 0.8)',
+                '연결 오류': 'rgba(255, 206, 86, 0.8)',
+                '데이터 이상': 'rgba(75, 192, 192, 0.8)',
+                '일반 이벤트': 'rgba(126, 87, 194, 0.8)'
+            };
+            
+            // 데이터셋 생성 (이벤트 타입별로)
+            const datasets = Array.from(eventTypes).map(eventType => ({
+                label: eventType,
+                data: labels.map(date => dateGroups[date][eventType] || 0),
+                backgroundColor: colorMap[eventType] || 'rgba(126, 87, 194, 0.8)',
+                borderColor: (colorMap[eventType] || 'rgba(126, 87, 194, 0.8)').replace('0.8', '1'),
+                borderWidth: 1,
+                borderRadius: 4
+            }));
+            
             return {
-                labels: data.data.map(item => new Date(item.timestamp).toLocaleDateString()),
-                datasets: [{
-                    label: data.label || '이벤트 수',
-                    data: data.data.map(item => item.value),
-                    backgroundColor: 'rgba(126, 87, 194, 0.6)',
-                    borderColor: 'rgba(126, 87, 194, 1)',
-                    borderWidth: 1
-                }]
+                labels,
+                datasets
             };
         }
 
@@ -342,6 +395,52 @@ const DataAnalysisPage = () => {
                 }
             ]
         };
+    };
+
+    // 시간 범위에 따른 라벨 형식 결정
+    const getTimeLabel = (timestamp) => {
+        const date = new Date(timestamp);
+        
+        switch (timeRange) {
+            case 'day':
+                // 24시간: 시:분 형식
+                return date.toLocaleString('ko-KR', { 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    timeZone: 'Asia/Seoul'
+                });
+            case 'week':
+                // 7일: 월/일 시:분 형식
+                return date.toLocaleString('ko-KR', { 
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    timeZone: 'Asia/Seoul'
+                });
+            case 'month':
+                // 30일: 월/일 형식
+                return date.toLocaleString('ko-KR', { 
+                    month: '2-digit',
+                    day: '2-digit',
+                    timeZone: 'Asia/Seoul'
+                });
+            case 'year':
+                // 1년: 년/월 형식
+                return date.toLocaleString('ko-KR', { 
+                    year: '2-digit',
+                    month: '2-digit',
+                    timeZone: 'Asia/Seoul'
+                });
+            default:
+                return date.toLocaleString('ko-KR', { 
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    timeZone: 'Asia/Seoul'
+                });
+        }
     };
 
     // 실시간 데이터 업데이트 함수
@@ -448,7 +547,6 @@ const DataAnalysisPage = () => {
                     <option value="usage">사용량 분석</option>
                     <option value="sensor">센서 데이터 분석</option>
                     <option value="events">이벤트 로그 분석</option>
-                    <option value="performance">성능 분석</option>
                 </select>
             </div>
 
@@ -495,7 +593,6 @@ const DataAnalysisPage = () => {
                             </div>
                         )}
                         {analysisType === 'events' && '이벤트 로그 분석'}
-                        {analysisType === 'performance' && '성능 분석'}
                     </h4>
                     
                     {/* 실시간 모드 토글 - 센서 분석일 때만 표시 */}
@@ -605,36 +702,57 @@ const DataAnalysisPage = () => {
                         }} />}
                         {analysisType === 'sensor' && (
                             sensors.length > 0 ? (
-                                // 센서가 있을 때는 통합 차트 표시
+                                // 센서가 있을 때는 통합 차트 표시 (황화수소 센서 스타일)
                                 <Line data={{
                                     labels: sensors.length > 0 && sensorData[sensors[0].sensor_id] ? 
-                                        sensorData[sensors[0].sensor_id].slice(-20).map(d => {
-                                            const date = new Date(d.timestamp);
-                                            return date.toLocaleString('ko-KR', { 
-                                                month: '2-digit',
-                                                day: '2-digit',
-                                                hour: '2-digit', 
-                                                minute: '2-digit',
-                                                timeZone: 'Asia/Seoul'
-                                            });
-                                        }) : [],
+                                        sensorData[sensors[0].sensor_id].slice(
+                                            timeRange === 'day' ? -48 : 
+                                            timeRange === 'week' ? -84 : 
+                                            timeRange === 'month' ? -120 : 
+                                            timeRange === 'year' ? -365 : -50
+                                        ).map(d => getTimeLabel(d.timestamp)) : [],
                                     datasets: sensors.map((sensor, index) => {
                                         const sensorValues = (sensorData[sensor.sensor_id] || []).map(d => d.value);
+                                        let dataSlice;
+                                        switch (timeRange) {
+                                            case 'day':
+                                                dataSlice = -48;
+                                                break;
+                                            case 'week':
+                                                dataSlice = -84;
+                                                break;
+                                            case 'month':
+                                                dataSlice = -120;
+                                                break;
+                                            case 'year':
+                                                dataSlice = -365;
+                                                break;
+                                            default:
+                                                dataSlice = -50;
+                                        }
+                                        
+                                        // 황화수소 센서 스타일 색상 (오렌지 계열)
                                         const colors = [
-                                            'rgba(255, 99, 132, 0.8)',
-                                            'rgba(54, 162, 235, 0.8)',
-                                            'rgba(255, 206, 86, 0.8)',
-                                            'rgba(75, 192, 192, 0.8)',
-                                            'rgba(153, 102, 255, 0.8)',
-                                            'rgba(255, 159, 64, 0.8)'
+                                            'rgba(255, 159, 64, 0.8)',   // 오렌지
+                                            'rgba(255, 99, 132, 0.8)',   // 빨강
+                                            'rgba(54, 162, 235, 0.8)',   // 파랑
+                                            'rgba(255, 206, 86, 0.8)',   // 노랑
+                                            'rgba(75, 192, 192, 0.8)',   // 청록
+                                            'rgba(153, 102, 255, 0.8)'   // 보라
                                         ];
+                                        
                                         return {
                                             label: sensor.name,
-                                            data: sensorValues.slice(-20), // 최근 20개 데이터만
+                                            data: sensorValues.slice(dataSlice),
                                             borderColor: colors[index % colors.length],
                                             backgroundColor: colors[index % colors.length].replace('0.8', '0.1'),
-                                            tension: 0.1,
-                                            fill: false
+                                            tension: 0.2,
+                                            fill: true,
+                                            pointBackgroundColor: colors[index % colors.length],
+                                            pointBorderColor: '#fff',
+                                            pointBorderWidth: 2,
+                                            pointRadius: 3,
+                                            pointHoverRadius: 5
                                         };
                                     })
                                 }} options={{
@@ -642,12 +760,88 @@ const DataAnalysisPage = () => {
                                     maintainAspectRatio: false,
                                     plugins: {
                                         legend: {
-                                            position: 'top'
+                                            position: 'top',
+                                            labels: {
+                                                usePointStyle: true,
+                                                padding: 20,
+                                                font: {
+                                                    size: 12
+                                                }
+                                            }
+                                        },
+                                        tooltip: {
+                                            mode: 'index',
+                                            intersect: false,
+                                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                            titleColor: '#fff',
+                                            bodyColor: '#fff',
+                                            borderColor: 'rgba(255, 159, 64, 1)',
+                                            borderWidth: 1,
+                                            callbacks: {
+                                                title: function(context) {
+                                                    return `시간: ${context[0].label}`;
+                                                },
+                                                label: function(context) {
+                                                    return `${context.dataset.label}: ${context.parsed.y.toFixed(3)} ppm`;
+                                                }
+                                            }
                                         }
                                     },
                                     scales: {
                                         y: {
-                                            beginAtZero: true
+                                            beginAtZero: true,
+                                            grid: {
+                                                color: 'rgba(255, 159, 64, 0.1)',
+                                                drawBorder: false
+                                            },
+                                            title: {
+                                                display: true,
+                                                text: '센서 값 (ppm)',
+                                                color: 'rgba(255, 159, 64, 0.8)',
+                                                font: {
+                                                    size: 14,
+                                                    weight: 'bold'
+                                                }
+                                            },
+                                            ticks: {
+                                                color: 'rgba(255, 159, 64, 0.7)'
+                                            }
+                                        },
+                                        x: {
+                                            grid: {
+                                                color: 'rgba(255, 159, 64, 0.1)',
+                                                drawBorder: false
+                                            },
+                                            title: {
+                                                display: true,
+                                                text: timeRange === 'day' ? '시간' : 
+                                                      timeRange === 'week' ? '날짜/시간' : 
+                                                      timeRange === 'month' ? '날짜' : 
+                                                      timeRange === 'year' ? '월' : '시간',
+                                                color: 'rgba(255, 159, 64, 0.8)',
+                                                font: {
+                                                    size: 14,
+                                                    weight: 'bold'
+                                                }
+                                            },
+                                            ticks: {
+                                                color: 'rgba(255, 159, 64, 0.7)',
+                                                maxTicksLimit: timeRange === 'day' ? 12 : 
+                                                              timeRange === 'week' ? 14 : 
+                                                              timeRange === 'month' ? 15 : 12
+                                            }
+                                        }
+                                    },
+                                    interaction: {
+                                        mode: 'index',
+                                        intersect: false
+                                    },
+                                    elements: {
+                                        line: {
+                                            borderWidth: 2
+                                        },
+                                        point: {
+                                            hoverBorderWidth: 3
                                         }
                                     }
                                 }} />
@@ -674,22 +868,58 @@ const DataAnalysisPage = () => {
                             maintainAspectRatio: false,
                             plugins: {
                                 legend: {
-                                    position: 'top'
+                                    position: 'top',
+                                    labels: {
+                                        usePointStyle: true,
+                                        padding: 20
+                                    }
+                                },
+                                tooltip: {
+                                    mode: 'index',
+                                    intersect: false,
+                                    callbacks: {
+                                        title: function(context) {
+                                            return `날짜: ${context[0].label}`;
+                                        },
+                                        label: function(context) {
+                                            return `${context.dataset.label}: ${context.parsed.y}건`;
+                                        },
+                                        footer: function(tooltipItems) {
+                                            let total = 0;
+                                            tooltipItems.forEach(function(tooltipItem) {
+                                                total += tooltipItem.parsed.y;
+                                            });
+                                            return `총 이벤트: ${total}건`;
+                                        }
+                                    }
                                 }
                             },
                             scales: {
+                                x: {
+                                    stacked: true,
+                                    grid: {
+                                        display: false
+                                    },
+                                    title: {
+                                        display: true,
+                                        text: '날짜'
+                                    }
+                                },
                                 y: {
-                                    beginAtZero: true
+                                    stacked: true,
+                                    beginAtZero: true,
+                                    title: {
+                                        display: true,
+                                        text: '이벤트 발생 횟수'
+                                    },
+                                    grid: {
+                                        color: 'rgba(0, 0, 0, 0.1)'
+                                    }
                                 }
-                            }
-                        }} />}
-                        {analysisType === 'performance' && <Pie data={chartData} options={{
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    position: 'top'
-                                }
+                            },
+                            interaction: {
+                                mode: 'index',
+                                intersect: false
                             }
                         }} />}
                     </div>
@@ -699,358 +929,6 @@ const DataAnalysisPage = () => {
                     </div>
                 )}
             </div>
-
-            {/* 분석 유형별 상세 정보 */}
-            {selectedDevice && chartData && (
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow mb-6">
-                    <h4 className="text-lg font-bold mb-4 text-[#7e57c2]">분석 결과 요약</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-                            <h5 className="font-semibold text-blue-700 dark:text-blue-300">총 데이터 포인트</h5>
-                            <p className="text-2xl font-bold text-blue-800 dark:text-blue-200">
-                                {chartData.datasets[0]?.data?.length || 0}개
-                            </p>
-                        </div>
-                        <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
-                            <h5 className="font-semibold text-green-700 dark:text-green-300">평균값</h5>
-                            <p className="text-2xl font-bold text-green-800 dark:text-green-200">
-                                {chartData.datasets[0]?.data?.length > 0 
-                                    ? (chartData.datasets[0].data.reduce((a, b) => a + b, 0) / chartData.datasets[0].data.length).toFixed(1)
-                                    : 0}
-                            </p>
-                        </div>
-                        <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
-                            <h5 className="font-semibold text-purple-700 dark:text-purple-300">최대값</h5>
-                            <p className="text-2xl font-bold text-purple-800 dark:text-purple-200">
-                                {chartData.datasets[0]?.data?.length > 0 
-                                    ? Math.max(...chartData.datasets[0].data).toFixed(1)
-                                    : 0}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* 센서별 상세 데이터 - 센서 데이터 분석일 때만 표시 */}
-            {analysisType === 'sensor' && selectedDevice && sensors.length > 0 && (
-                <div className="grid grid-cols-1 gap-6">
-                    <div className="flex items-center justify-between">
-                        <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">센서별 상세 분석</h3>
-                        <div className="text-sm text-gray-500">
-                            총 {sensors.length}개 센서 연결됨
-                        </div>
-                    </div>
-                    {sensors.map((sensor, index) => {
-                        const chartType = index % 3; // 0: Line, 1: Bar, 2: Doughnut
-                        const sensorValues = (sensorData[sensor.sensor_id] || []).map(d => d.value);
-                        const isActive = sensorValues.length > 0;
-                        const latestValue = isActive ? sensorValues[sensorValues.length - 1] : null;
-                        const avgValue = isActive ? (sensorValues.reduce((a, b) => a + b, 0) / sensorValues.length) : null;
-                        const minValue = isActive ? Math.min(...sensorValues) : null;
-                        const maxValue = isActive ? Math.max(...sensorValues) : null;
-                        
-                        return (
-                            <div key={sensor.sensor_id} className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
-                                {/* 센서 헤더 */}
-                                <div className="flex items-center justify-between mb-4">
-                                    <div className="flex items-center space-x-3">
-                                        <div className={`w-3 h-3 rounded-full ${isActive ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                                        <h4 className="text-lg font-bold text-[#7e57c2]">{sensor.name}</h4>
-                                        <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2 py-1 rounded">
-                                            {sensor.type}
-                                        </span>
-                                        {isRealTimeMode && isActive && (
-                                            <div className="flex items-center space-x-1">
-                                                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                                                <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-2 py-1 rounded">
-                                                    실시간
-                                                </span>
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-xs text-gray-500">센서 ID: {sensor.sensor_id}</p>
-                                        <p className={`text-xs font-semibold ${isActive ? 'text-green-600' : 'text-red-600'}`}>
-                                            {isActive ? '활성' : '비활성'}
-                                        </p>
-                                    </div>
-                                </div>
-
-                                {/* 센서 통계 카드 */}
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                                    <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg text-center">
-                                        <p className="text-xs text-blue-600 dark:text-blue-400">최신값</p>
-                                        <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
-                                            {latestValue !== null ? latestValue.toFixed(3) : 'N/A'}
-                                        </p>
-                                    </div>
-                                    <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg text-center">
-                                        <p className="text-xs text-green-600 dark:text-green-400">평균값</p>
-                                        <p className="text-lg font-bold text-green-700 dark:text-green-300">
-                                            {avgValue !== null ? avgValue.toFixed(3) : 'N/A'}
-                                        </p>
-                                    </div>
-                                    <div className="bg-orange-50 dark:bg-orange-900/20 p-3 rounded-lg text-center">
-                                        <p className="text-xs text-orange-600 dark:text-orange-400">최소값</p>
-                                        <p className="text-lg font-bold text-orange-700 dark:text-orange-300">
-                                            {minValue !== null ? minValue.toFixed(3) : 'N/A'}
-                                        </p>
-                                    </div>
-                                    <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-lg text-center">
-                                        <p className="text-xs text-red-600 dark:text-red-400">최대값</p>
-                                        <p className="text-lg font-bold text-red-700 dark:text-red-300">
-                                            {maxValue !== null ? maxValue.toFixed(3) : 'N/A'}
-                                        </p>
-                                    </div>
-                                </div>
-
-                                {/* 차트 영역 */}
-                                <div className="h-[300px] mb-4">
-                                    {!isActive ? (
-                                        <div className="flex items-center justify-center h-full bg-gray-50 dark:bg-gray-700 rounded-lg">
-                                            <div className="text-center">
-                                                <div className="text-gray-400 mb-2">📊</div>
-                                                <p className="text-gray-500">센서 데이터가 없습니다</p>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            {chartType === 0 && (
-                                                <Line
-                                                    data={{
-                                                        labels: (sensorData[sensor.sensor_id] || []).map(d => {
-                                                            const date = new Date(d.timestamp);
-                                                            return date.toLocaleString('ko-KR', { 
-                                                                month: '2-digit',
-                                                                day: '2-digit',
-                                                                hour: '2-digit', 
-                                                                minute: '2-digit',
-                                                                timeZone: 'Asia/Seoul'
-                                                            });
-                                                        }),
-                                                        datasets: [{
-                                                            label: sensor.name,
-                                                            data: sensorValues,
-                                                            borderColor: '#7e57c2',
-                                                            backgroundColor: 'rgba(126, 87, 194, 0.1)',
-                                                            tension: 0.2,
-                                                            fill: true,
-                                                            pointBackgroundColor: '#7e57c2',
-                                                            pointBorderColor: '#fff',
-                                                            pointBorderWidth: 2,
-                                                            pointRadius: 4
-                                                        }]
-                                                    }}
-                                                    options={{
-                                                        responsive: true,
-                                                        maintainAspectRatio: false,
-                                                        plugins: {
-                                                            legend: {
-                                                                display: true,
-                                                                position: 'top'
-                                                            }
-                                                        },
-                                                        scales: {
-                                                            y: {
-                                                                beginAtZero: true,
-                                                                grid: {
-                                                                    color: 'rgba(0, 0, 0, 0.1)'
-                                                                }
-                                                            },
-                                                            x: {
-                                                                grid: {
-                                                                    color: 'rgba(0, 0, 0, 0.1)'
-                                                                }
-                                                            }
-                                                        }
-                                                    }}
-                                                />
-                                            )}
-                                            {chartType === 1 && (
-                                                <Bar
-                                                    data={{
-                                                        labels: (sensorData[sensor.sensor_id] || []).slice(-10).map(d => {
-                                                            const date = new Date(d.timestamp);
-                                                            return date.toLocaleString('ko-KR', { 
-                                                                month: '2-digit',
-                                                                day: '2-digit',
-                                                                hour: '2-digit', 
-                                                                minute: '2-digit',
-                                                                timeZone: 'Asia/Seoul'
-                                                            });
-                                                        }),
-                                                        datasets: [{
-                                                            label: sensor.name,
-                                                            data: sensorValues.slice(-10),
-                                                            backgroundColor: 'rgba(54, 162, 235, 0.6)',
-                                                            borderColor: 'rgba(54, 162, 235, 1)',
-                                                            borderWidth: 1,
-                                                            borderRadius: 4
-                                                        }]
-                                                    }}
-                                                    options={{
-                                                        responsive: true,
-                                                        maintainAspectRatio: false,
-                                                        plugins: {
-                                                            legend: {
-                                                                display: true,
-                                                                position: 'top'
-                                                            }
-                                                        },
-                                                        scales: {
-                                                            y: {
-                                                                beginAtZero: true,
-                                                                grid: {
-                                                                    color: 'rgba(0, 0, 0, 0.1)'
-                                                                }
-                                                            },
-                                                            x: {
-                                                                grid: {
-                                                                    color: 'rgba(0, 0, 0, 0.1)'
-                                                                }
-                                                            }
-                                                        }
-                                                    }}
-                                                />
-                                            )}
-                                            {chartType === 2 && (
-                                                <Doughnut
-                                                    data={{
-                                                        labels: ['최소값', '평균값', '최대값'],
-                                                        datasets: [{
-                                                            data: [minValue, avgValue, maxValue],
-                                                            backgroundColor: [
-                                                                'rgba(255, 99, 132, 0.8)',
-                                                                'rgba(255, 206, 86, 0.8)',
-                                                                'rgba(75, 192, 192, 0.8)'
-                                                            ],
-                                                            borderColor: [
-                                                                'rgba(255, 99, 132, 1)',
-                                                                'rgba(255, 206, 86, 1)',
-                                                                'rgba(75, 192, 192, 1)'
-                                                            ],
-                                                            borderWidth: 2
-                                                        }]
-                                                    }}
-                                                    options={{
-                                                        responsive: true,
-                                                        maintainAspectRatio: false,
-                                                        plugins: {
-                                                            legend: {
-                                                                position: 'right'
-                                                            }
-                                                        }
-                                                    }}
-                                                />
-                                            )}
-                                        </>
-                                    )}
-                                </div>
-
-                                {/* 추가 정보 */}
-                                <div className="flex items-center justify-between text-sm text-gray-500">
-                                    <span>데이터 포인트: {sensorValues.length}개</span>
-                                    <div className="flex items-center space-x-2">
-                                        <span>차트 타입: {chartType === 0 ? 'Line' : chartType === 1 ? 'Bar' : 'Doughnut'}</span>
-                                        {isRealTimeMode && isActive && (
-                                            <span className="text-green-600">● 실시간 업데이트</span>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
-
-            {/* 전체 센서 데이터 요약 - 모든 분석 유형에서 표시 */}
-            {selectedDevice && (
-                <div className="mt-6 bg-white dark:bg-gray-800 p-6 rounded-xl shadow">
-                    <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4">가스 센서 데이터 요약</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {/* 메탄 가스 센서 (MQ4) */}
-                        <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg">
-                            <h4 className="font-semibold text-yellow-700 dark:text-yellow-300 mb-2">메탄 가스 (MQ4)</h4>
-                            {(() => {
-                                const methaneSensor = sensors.find(s => s.name.includes('메탄') || s.name.includes('MQ4') || s.type.includes('gas'));
-                                const methaneData = methaneSensor ? sensorData[methaneSensor.sensor_id] : null;
-                                const latestMethane = methaneData && methaneData.length > 0 ? methaneData[methaneData.length - 1].value : null;
-                                return (
-                                    <>
-                                        <p className="text-2xl font-bold text-yellow-800 dark:text-yellow-200">
-                                            {latestMethane !== null ? `${latestMethane.toFixed(3)}ppm` : '0.025ppm'}
-                                        </p>
-                                        <p className="text-sm text-yellow-600">
-                                            {latestMethane !== null ? (latestMethane < 0.5 ? '안전 수준' : '주의 필요') : '안전 수준'}
-                                        </p>
-                                    </>
-                                );
-                            })()}
-                        </div>
-                        
-                        {/* 황화수소 센서 (MQ136) */}
-                        <div className="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-lg">
-                            <h4 className="font-semibold text-orange-700 dark:text-orange-300 mb-2">황화수소 (MQ136)</h4>
-                            {(() => {
-                                const h2sSensor = sensors.find(s => s.name.includes('황화수소') || s.name.includes('MQ136'));
-                                const h2sData = h2sSensor ? sensorData[h2sSensor.sensor_id] : null;
-                                const latestH2s = h2sData && h2sData.length > 0 ? h2sData[h2sData.length - 1].value : null;
-                                return (
-                                    <>
-                                        <p className="text-2xl font-bold text-orange-800 dark:text-orange-200">
-                                            {latestH2s !== null ? `${latestH2s.toFixed(3)}ppm` : '0.045ppm'}
-                                        </p>
-                                        <p className="text-sm text-orange-600">
-                                            {latestH2s !== null ? (latestH2s < 0.8 ? '안전 수준' : '주의 필요') : '안전 수준'}
-                                        </p>
-                                    </>
-                                );
-                            })()}
-                        </div>
-                        
-                        {/* 암모니아 센서 (MQ137) */}
-                        <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg">
-                            <h4 className="font-semibold text-red-700 dark:text-red-300 mb-2">암모니아 (MQ137)</h4>
-                            {(() => {
-                                const nh3Sensor = sensors.find(s => s.name.includes('암모니아') || s.name.includes('MQ137'));
-                                const nh3Data = nh3Sensor ? sensorData[nh3Sensor.sensor_id] : null;
-                                const latestNh3 = nh3Data && nh3Data.length > 0 ? nh3Data[nh3Data.length - 1].value : null;
-                                return (
-                                    <>
-                                        <p className="text-2xl font-bold text-red-800 dark:text-red-200">
-                                            {latestNh3 !== null ? `${latestNh3.toFixed(3)}ppm` : '0.085ppm'}
-                                        </p>
-                                        <p className="text-sm text-red-600">
-                                            {latestNh3 !== null ? (latestNh3 < 1.2 ? '안전 수준' : '주의 필요') : '안전 수준'}
-                                        </p>
-                                    </>
-                                );
-                            })()}
-                        </div>
-                        
-                        {/* 연결 상태 */}
-                        <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
-                            <h4 className="font-semibold text-purple-700 dark:text-purple-300 mb-2">연결 상태</h4>
-                            <p className="text-2xl font-bold text-purple-800 dark:text-purple-200">{sensors.length}개</p>
-                            <p className="text-sm text-purple-600">
-                                {(() => {
-                                    const activeSensors = sensors.filter(sensor => {
-                                        const data = sensorData[sensor.sensor_id];
-                                        return data && data.length > 0;
-                                    }).length;
-                                    return `${activeSensors}개 활성, ${sensors.length - activeSensors}개 비활성`;
-                                })()}
-                            </p>
-                            {isRealTimeMode && (
-                                <div className="flex items-center space-x-1 mt-2">
-                                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                                    <span className="text-xs text-green-600">실시간 모니터링</span>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };
