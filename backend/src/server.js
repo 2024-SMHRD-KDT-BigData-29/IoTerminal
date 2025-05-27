@@ -16,6 +16,7 @@ const weatherRoutes = require('./routes/weatherRoutes');
 const usersRoutes = require('./routes/users');
 const sensorRoutes = require('./routes/sensorRoutes');
 const deviceSensorRoutes = require('./routes/deviceSensorRoutes');
+const analysisRoutes = require('./routes/analysisRoutes');
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -63,6 +64,7 @@ app.use('/api/weather', weatherRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/sensors', sensorRoutes);
 app.use('/api/device-sensors', deviceSensorRoutes);
+app.use('/api/analysis', analysisRoutes);
 
 // 테스트 라우트
 app.get('/test', (req, res) => {

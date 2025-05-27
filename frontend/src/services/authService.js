@@ -39,20 +39,28 @@ export const login = async (userId, password, keepLoggedIn = false) => {
  */
 export const register = async (userData) => {
     try {
-        const response = await axios.post(`${API_URL}/auth/register`, {
+        console.log('회원가입 요청 데이터:', userData);
+        console.log('API URL:', `${API_URL}/auth/register`);
+        
+        const requestData = {
             userId: userData.userId,
             password: userData.password,
             name: userData.name,
             email: userData.email,
             phone: userData.phone || null,
             gender: userData.gender || null,
-            birth_date: userData.birthdate ? userData.birthdate.toISOString().split('T')[0] : null,
+            birthdate: userData.birthdate ? userData.birthdate.toISOString().split('T')[0] : null,
             address: userData.address || null
-        });
+        };
+        
+        console.log('실제 전송 데이터:', requestData);
+        
+        const response = await axios.post(`${API_URL}/auth/register`, requestData);
 
         return response.data;
     } catch (error) {
         console.error('회원가입 오류:', error);
+        console.error('오류 응답:', error.response);
         throw error.response?.data || error;
     }
 };

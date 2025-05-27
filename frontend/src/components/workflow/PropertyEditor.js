@@ -1,5 +1,6 @@
 // File: frontend/src/components/workflow/PropertyEditor.js
 import React, { useState, useEffect } from 'react';
+import { updateSensor } from '../../services/sensorService';
 
 function PropertyEditor({ selectedNode, onUpdateNode }) {
     const [localProperties, setLocalProperties] = useState({});
@@ -9,9 +10,23 @@ function PropertyEditor({ selectedNode, onUpdateNode }) {
         else setLocalProperties({});
     }, [selectedNode]);
 
-    const handlePropertyChange = (key, value) => {
+    const handlePropertyChange = async (key, value) => {
         const updated = { ...localProperties, [key]: value };
         setLocalProperties(updated);
+
+        // 센서 노드의 label(이름) 변경 시 DB도 업데이트
+        if (
+            key === 'label' &&
+            selectedNode?.data?.type === 'Sensor' &&
+            selectedNode?.data?.sensorId
+        ) {
+            try {
+                await updateSensor(selectedNode.data.sensorId, { name: value });
+            } catch (e) {
+                alert('센서 이름 변경에 실패했습니다.');
+            }
+        }
+
         if (selectedNode?.id && onUpdateNode) onUpdateNode(selectedNode.id, updated);
     };
 

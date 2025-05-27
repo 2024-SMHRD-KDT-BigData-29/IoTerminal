@@ -19,6 +19,8 @@ import { getCalendarEvents, createCalendarEvent, updateCalendarEvent, deleteCale
 import { getCurrentUserData } from '../services/authService';
 import { getWorkflowList } from '../api/workflow';
 import { getUserDevices } from '../services/deviceService';
+import { Bar } from 'react-chartjs-2';
+import axios from 'axios';
 
 moment.locale('ko');
 const localizer = momentLocalizer(moment);
@@ -172,6 +174,8 @@ function DashboardPage() {
     const currentUser = getCurrentUserData();
     const userId = currentUser?.user_id;
 
+    const [latestSensorValues, setLatestSensorValues] = useState([]);
+
     // 캘린더 이벤트 로드
     useEffect(() => {
         const loadCalendarEvents = async () => {
@@ -287,6 +291,32 @@ function DashboardPage() {
         });
         return () => { if (socketRef.current) socketRef.current.disconnect(); };
     }, []);
+
+    // 센서별 최신값 로드
+    useEffect(() => {
+        axios.get('/api/sensors/latest-values')
+            .then(res => setLatestSensorValues(res.data.sensors || []))
+            .catch(err => console.error('[DashboardPage] 센서별 최신값 로드 실패:', err));
+    }, []);
+
+    // 시각화용 데이터 가공
+    const gasSensors = latestSensorValues.filter(s => s.name.includes('메탄') || s.name.includes('황화수소') || s.name.includes('암모니아'));
+    const otherSensors = latestSensorValues.filter(s => !gasSensors.includes(s));
+
+    const barData = {
+        labels: gasSensors.map(s => s.name),
+        datasets: [
+            {
+                label: '최신 측정값',
+                data: gasSensors.map(s => s.latestValue),
+                backgroundColor: [
+                    'rgba(123, 104, 238, 0.7)',
+                    'rgba(255, 193, 7, 0.7)',
+                    'rgba(76, 175, 80, 0.7)'
+                ]
+            }
+        ]
+    };
 
     const getIconComponentForSensor = (sensorName = "") => {
         const lowerSensorName = sensorName.toLowerCase();

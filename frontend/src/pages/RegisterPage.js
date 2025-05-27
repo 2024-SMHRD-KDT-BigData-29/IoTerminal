@@ -95,6 +95,13 @@ const RegisterPage = () => {
         }));
     };
 
+    const handleAddressSelect = (address) => {
+        setFormData(prev => ({
+            ...prev,
+            address: address
+        }));
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
@@ -319,14 +326,16 @@ const RegisterPage = () => {
                             <label htmlFor="address" className="block text-sm font-medium text-[#3a2e5a] dark:text-[#b39ddb]">
                                 주소
                             </label>
-                            <AddressSearchInput
-                                value={formData.address}
-                                onChange={addr => setFormData(prev => ({ ...prev, address: addr }))}
-                            />
+                            <div className="mt-1">
+                                <AddressSearchInput
+                                    value={formData.address}
+                                    onAddressSelect={handleAddressSelect}
+                                />
+                            </div>
                         </div>
 
                         <div>
-                            <label htmlFor="addressDetail" className="block text-sm font-medium text-[#3a2e5a] dark:text-[#b39ddb] mt-2">
+                            <label htmlFor="addressDetail" className="block text-sm font-medium text-[#3a2e5a] dark:text-[#b39ddb]">
                                 상세주소
                             </label>
                             <input
@@ -334,9 +343,9 @@ const RegisterPage = () => {
                                 name="addressDetail"
                                 type="text"
                                 value={formData.addressDetail}
-                                onChange={e => setFormData(prev => ({ ...prev, addressDetail: e.target.value }))}
+                                onChange={handleChange}
                                 className="mt-1 block w-full px-4 py-3 rounded-xl border border-[#d1c4e9] dark:border-[#9575cd] bg-white dark:bg-[#2a2139] text-[#3a2e5a] dark:text-[#b39ddb] placeholder-[#9575cd] dark:placeholder-[#b39ddb] focus:ring-2 focus:ring-[#7e57c2] dark:focus:ring-[#9575cd] focus:border-transparent transition-colors duration-200"
-                                placeholder="상세주소를 입력하세요 (예: 101동 202호)"
+                                placeholder="상세주소를 입력하세요"
                             />
                         </div>
                     </div>

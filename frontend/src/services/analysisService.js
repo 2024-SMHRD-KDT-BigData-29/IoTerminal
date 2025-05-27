@@ -1,67 +1,85 @@
 // 데이터 분석 관련 API 서비스
 
-import api from './api';
+import axios from 'axios';
 
-// 기기별 사용량 데이터 가져오기
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
+
+/**
+ * 디바이스 사용량 분석 데이터를 가져옵니다.
+ * @param {string} deviceId - 디바이스 ID
+ * @param {Object} dateRange - 날짜 범위 {startDate, endDate}
+ * @returns {Promise<Object>} 사용량 분석 데이터
+ */
 export const getDeviceUsageData = async (deviceId, dateRange) => {
     try {
-        const response = await api.get(`/devices/${deviceId}/analytics/usage`, {
-            params: {
-                startDate: dateRange.startDate,
-                endDate: dateRange.endDate
-            }
-        });
+        const params = new URLSearchParams();
+        if (dateRange.startDate) params.append('startDate', dateRange.startDate);
+        if (dateRange.endDate) params.append('endDate', dateRange.endDate);
+        
+        const response = await axios.get(`${API_URL}/analysis/usage/${deviceId}?${params}`);
         return response.data;
     } catch (error) {
-        console.error('사용량 데이터 조회 실패:', error);
+        console.error('사용량 분석 데이터 조회 오류:', error);
         throw error;
     }
 };
 
-// 기기별 센서 데이터 가져오기
+/**
+ * 디바이스 센서 데이터 분석을 가져옵니다.
+ * @param {string} deviceId - 디바이스 ID
+ * @param {Object} dateRange - 날짜 범위 {startDate, endDate}
+ * @returns {Promise<Object>} 센서 데이터 분석
+ */
 export const getDeviceSensorData = async (deviceId, dateRange) => {
     try {
-        const response = await api.get(`/devices/${deviceId}/analytics/sensor`, {
-            params: {
-                startDate: dateRange.startDate,
-                endDate: dateRange.endDate
-            }
-        });
+        const params = new URLSearchParams();
+        if (dateRange.startDate) params.append('startDate', dateRange.startDate);
+        if (dateRange.endDate) params.append('endDate', dateRange.endDate);
+        
+        const response = await axios.get(`${API_URL}/analysis/sensor/${deviceId}?${params}`);
         return response.data;
     } catch (error) {
-        console.error('센서 데이터 조회 실패:', error);
+        console.error('센서 데이터 분석 조회 오류:', error);
         throw error;
     }
 };
 
-// 기기별 이벤트 로그 가져오기
+/**
+ * 디바이스 이벤트 로그 분석을 가져옵니다.
+ * @param {string} deviceId - 디바이스 ID
+ * @param {Object} dateRange - 날짜 범위 {startDate, endDate}
+ * @returns {Promise<Object>} 이벤트 로그 분석
+ */
 export const getDeviceEventLogs = async (deviceId, dateRange) => {
     try {
-        const response = await api.get(`/devices/${deviceId}/analytics/events`, {
-            params: {
-                startDate: dateRange.startDate,
-                endDate: dateRange.endDate
-            }
-        });
+        const params = new URLSearchParams();
+        if (dateRange.startDate) params.append('startDate', dateRange.startDate);
+        if (dateRange.endDate) params.append('endDate', dateRange.endDate);
+        
+        const response = await axios.get(`${API_URL}/analysis/events/${deviceId}?${params}`);
         return response.data;
     } catch (error) {
-        console.error('이벤트 로그 조회 실패:', error);
+        console.error('이벤트 로그 분석 조회 오류:', error);
         throw error;
     }
 };
 
-// 기기별 성능 통계 가져오기
+/**
+ * 디바이스 성능 통계를 가져옵니다.
+ * @param {string} deviceId - 디바이스 ID
+ * @param {Object} dateRange - 날짜 범위 {startDate, endDate}
+ * @returns {Promise<Object>} 성능 통계
+ */
 export const getDevicePerformanceStats = async (deviceId, dateRange) => {
     try {
-        const response = await api.get(`/devices/${deviceId}/analytics/performance`, {
-            params: {
-                startDate: dateRange.startDate,
-                endDate: dateRange.endDate
-            }
-        });
+        const params = new URLSearchParams();
+        if (dateRange.startDate) params.append('startDate', dateRange.startDate);
+        if (dateRange.endDate) params.append('endDate', dateRange.endDate);
+        
+        const response = await axios.get(`${API_URL}/analysis/performance/${deviceId}?${params}`);
         return response.data;
     } catch (error) {
-        console.error('성능 통계 조회 실패:', error);
+        console.error('성능 통계 조회 오류:', error);
         throw error;
     }
 };
@@ -69,12 +87,7 @@ export const getDevicePerformanceStats = async (deviceId, dateRange) => {
 // 사용 패턴 분석 데이터 가져오기
 export const getUsagePatternData = async (deviceId, dateRange) => {
     try {
-        const response = await api.get(`/devices/${deviceId}/analytics`, {
-            params: {
-                startDate: dateRange.startDate,
-                endDate: dateRange.endDate
-            }
-        });
+        const response = await axios.get(`${API_URL}/analysis/usage/${deviceId}?${params}`);
 
         const data = response.data;
         const hourlyData = new Array(24).fill(0);
@@ -104,12 +117,7 @@ export const getUsagePatternData = async (deviceId, dateRange) => {
 // 효율성 분석 데이터 가져오기
 export const getEfficiencyData = async (deviceId, dateRange) => {
     try {
-        const response = await api.get(`/devices/${deviceId}/analytics`, {
-            params: {
-                startDate: dateRange.startDate,
-                endDate: dateRange.endDate
-            }
-        });
+        const response = await axios.get(`${API_URL}/analysis/efficiency/${deviceId}?${params}`);
 
         const data = response.data;
         
@@ -136,7 +144,7 @@ export const getEfficiencyData = async (deviceId, dateRange) => {
 // 인사이트 데이터 가져오기
 export const getInsightsData = async (deviceId) => {
     try {
-        const response = await api.get(`/devices/${deviceId}/insights`);
+        const response = await axios.get(`${API_URL}/devices/${deviceId}/insights`);
         return response.data.insights || [];
     } catch (error) {
         console.error('인사이트 데이터 조회 실패:', error);
