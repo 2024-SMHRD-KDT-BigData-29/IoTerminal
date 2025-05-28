@@ -17,6 +17,10 @@ const usersRoutes = require('./routes/users');
 const sensorRoutes = require('./routes/sensorRoutes');
 const deviceSensorRoutes = require('./routes/deviceSensorRoutes');
 const analysisRoutes = require('./routes/analysisRoutes');
+const sensorAnomalyRoutes = require('./routes/sensorAnomalyRoutes');
+
+// 서비스 import
+const sensorAnomalyService = require('./services/sensorAnomalyService');
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -65,6 +69,7 @@ app.use('/api/users', usersRoutes);
 app.use('/api/sensors', sensorRoutes);
 app.use('/api/device-sensors', deviceSensorRoutes);
 app.use('/api/analysis', analysisRoutes);
+app.use('/api/sensor-alerts', sensorAnomalyRoutes);
 
 // 테스트 라우트
 app.get('/test', (req, res) => {
@@ -100,8 +105,22 @@ app.use((err, req, res, next) => {
 io.on('connection', (socket) => {
     console.log(`Socket.IO client connected: ${socket.id}`);
     socket.emit('welcome', `Welcome to the IoT Hub Mockup, client ${socket.id}!`);
+    
+    // 센서 이상치 알림 관련 소켓 이벤트
+    socket.on('join_sensor_alerts', (userId) => {
+        socket.join(`sensor_alerts_${userId}`);
+        console.log(`사용자 ${userId}가 센서 알림 룸에 참가했습니다.`);
+    });
+    
     socket.on('disconnect', () => console.log(`Socket.IO client disconnected: ${socket.id}`));
 });
+
+// 실시간 센서 알림 전송 함수
+const sendSensorAlert = (alert) => {
+    // 모든 연결된 클라이언트에게 센서 알림 전송
+    io.emit('sensor_anomaly_alert', alert);
+    console.log(`🚨 실시간 센서 알림 전송: ${alert.sensor_name} - ${alert.alert_type}`);
+};
 
 // 실제 센서 데이터를 가져와서 실시간 전송
 const db = require('./config/database');
@@ -275,6 +294,24 @@ const startRealTimeSensorData = () => {
                 eventActive: isEventActive // 이벤트 상태 정보
             };
             
+            // 센서 데이터 기반 이상치 알림 체크
+            try {
+                const alerts = await sensorAnomalyService.checkSensorAnomalies({
+                    mq4: sensorData.mq4,
+                    mq136: sensorData.mq136,
+                    mq137: sensorData.mq137,
+                    farmno: sensorData.farmno,
+                    zone: sensorData.zone
+                });
+
+                // 생성된 알림이 있으면 실시간으로 전송
+                alerts.forEach(alert => {
+                    sendSensorAlert(alert);
+                });
+            } catch (alertError) {
+                console.error('센서 이상치 알림 체크 오류:', alertError);
+            }
+            
             if (isEventActive) {
                 console.log('🔥 이벤트 센서 데이터:', sensorData);
             } else {
@@ -320,10 +357,14 @@ httpServer.listen(PORT, () => {
     console.log('- GET /api/workflow');
     console.log('- POST /api/workflow');
     console.log('- GET /api/dashboard');
+    console.log('- GET /api/sensor-alerts/alerts');
+    console.log('- GET /api/sensor-alerts/thresholds');
+    console.log('- POST /api/sensor-alerts/test-alert');
     console.log('- GET /test');
     console.log(`Socket.IO 서버가 포트 ${PORT}에서 실행 중입니다.`);
     console.log(`프론트엔드 접근 허용: ${FRONTEND_URL}`);
     console.log('실시간 센서 데이터 스트리밍이 시작되었습니다.');
+    console.log('🚨 센서 이상치 감지 알림 시스템이 활성화되었습니다.');
 });
 
 // 서버 종료 시 정리

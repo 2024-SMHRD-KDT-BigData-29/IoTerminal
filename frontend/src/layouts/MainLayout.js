@@ -4,6 +4,7 @@ import { Search, Bell, User, ChevronDown, Moon, Sun, Activity, Box, BarChart, Se
 import { getCurrentUserData, logout } from '../services/authService';
 import io from 'socket.io-client';
 import Sidebar from './Sidebar';
+import SensorAlertDropdown from '../components/common/SensorAlertDropdown';
 
 const SOCKET_SERVER_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:3001';
 const KAKAO_REST_API_KEY = process.env.REACT_APP_KAKAO_REST_API_KEY;
@@ -163,9 +164,7 @@ const MainLayout = () => {
                             <button className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-[#3a2e5a]" title="검색">
                                 <Search size={20} className="text-gray-600 dark:text-[#b39ddb]" />
                             </button>
-                            <button className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-[#3a2e5a]" title="알림">
-                                <Bell size={20} className="text-gray-600 dark:text-[#b39ddb]" />
-                            </button>
+                            <SensorAlertDropdown />
                             <button
                                 onClick={toggleDarkMode}
                                 className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-[#3a2e5a]"
