@@ -303,7 +303,7 @@ exports.updateWorkflow = async (req, res) => {
 
         // 워크플로우 존재 여부와 권한 확인
         const [existingWorkflow] = await pool.execute(
-            'SELECT * FROM workflows WHERE workflow_id = ? AND (user_id = ? OR is_public = true)',
+            'SELECT * FROM workflows WHERE workflow_id = ? AND user_id = ?',
             [workflowId, userId]
         );
 
@@ -311,6 +311,37 @@ exports.updateWorkflow = async (req, res) => {
             return res.status(404).json({
                 success: false,
                 message: '워크플로우를 찾을 수 없거나 수정 권한이 없습니다.'
+            });
+        }
+
+        const currentWorkflow = existingWorkflow[0];
+
+        // 이름만 변경하는 경우 (부분 업데이트)
+        if (name && !nodes && !edges && description === undefined && isPublic === undefined && !deviceSensorLinks) {
+            const [result] = await pool.execute(
+                'UPDATE workflows SET name = ?, updated_at = CURRENT_TIMESTAMP WHERE workflow_id = ? AND user_id = ?',
+                [name, workflowId, userId]
+            );
+
+            if (result.affectedRows === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: '워크플로우를 찾을 수 없거나 수정 권한이 없습니다.'
+                });
+            }
+
+            return res.json({
+                success: true,
+                message: '워크플로우 이름이 성공적으로 변경되었습니다.',
+                workflow: {
+                    workflow_id: workflowId,
+                    name,
+                    description: currentWorkflow.description,
+                    nodes: currentWorkflow.nodes,
+                    edges: currentWorkflow.edges,
+                    user_id: userId,
+                    is_public: currentWorkflow.is_public
+                }
             });
         }
 

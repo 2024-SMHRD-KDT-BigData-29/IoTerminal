@@ -18,11 +18,38 @@ const WorkflowCanvasPage = () => {
     const [selectedNode, setSelectedNode] = useState(null);
     const [selectedEdgeId, setSelectedEdgeId] = useState(null);
     const [workflowName, setWorkflowName] = useState('새 워크플로우');
+    
+    // 디버깅: workflowName 상태 변화 추적
+    useEffect(() => {
+        console.log('워크플로우 이름 상태 변경:', workflowName);
+    }, [workflowName]);
     const [showImportModal, setShowImportModal] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const navigate = useNavigate();
     const { workflowId } = useParams();
     const cyRef = useRef(null);
+
+    // 노드/엣지 정규화 함수
+    const normalizeNode = useCallback((node) => {
+        return {
+            group: 'nodes',
+            ...node,
+            data: { ...node.data }
+        };
+    }, []);
+
+    const normalizeEdge = useCallback((edge) => {
+        return {
+            group: 'edges',
+            data: {
+                id: edge.data?.id || edge.id,
+                source: edge.data?.source || edge.source,
+                target: edge.data?.target || edge.target,
+                label: edge.data?.label || edge.label || '',
+                type: edge.data?.type || edge.type || 'default'
+            }
+        };
+    }, []);
 
     // elements를 set할 때 항상 구조를 보정 (불러오기 등)
     const setElementsFiltered = useCallback((newElements) => {
@@ -47,7 +74,7 @@ const WorkflowCanvasPage = () => {
         const allElements = [...nodes, ...edges];
         console.log('불러온 elements:', allElements);
         setElements(allElements);
-    }, []);
+    }, [normalizeNode]);
 
     // 워크플로우 불러오기
     useEffect(() => {
@@ -57,6 +84,8 @@ const WorkflowCanvasPage = () => {
                 try {
                     const response = await getWorkflowById(workflowId);
                     if (response.success) {
+                        console.log('[불러오기] 워크플로우 데이터:', response.workflow);
+                        console.log('[불러오기] 워크플로우 이름 설정:', response.workflow.name);
                         setWorkflowName(response.workflow.name);
                         setElementsFiltered([...response.workflow.nodes, ...response.workflow.edges]);
                         console.log('[불러오기] setElementsFiltered 호출됨');
@@ -76,28 +105,7 @@ const WorkflowCanvasPage = () => {
             };
             fetchWorkflow();
         }
-    }, [workflowId, navigate, setElementsFiltered]);
-
-    // 노드/엣지 정규화 함수
-    function normalizeNode(node) {
-        return {
-            group: 'nodes',
-            ...node,
-            data: { ...node.data }
-        };
-    }
-    function normalizeEdge(edge) {
-        return {
-            group: 'edges',
-            data: {
-                id: edge.data?.id || edge.id,
-                source: edge.data?.source || edge.source,
-                target: edge.data?.target || edge.target,
-                label: edge.data?.label || edge.label || '',
-                type: edge.data?.type || edge.type || 'default'
-            }
-        };
-    }
+    }, [workflowId, navigate]);
 
     const handleSaveWorkflow = async () => {
         if (!workflowName.trim()) {
@@ -431,13 +439,45 @@ const WorkflowCanvasPage = () => {
             {/* 상단 툴바 */}
             <div className="bg-white dark:bg-[#3a2e5a] shadow-sm p-4 flex items-center justify-between">
                 <div className="flex items-center space-x-4">
-                    <input
-                        type="text"
-                        value={workflowName}
-                        onChange={(e) => setWorkflowName(e.target.value)}
-                        className="text-xl font-semibold bg-transparent border-b border-[#d1c4e9] dark:border-[#9575cd] focus:border-[#7e57c2] dark:focus:border-[#b39ddb] focus:outline-none px-2 py-1 text-[#3a2e5a] dark:text-[#b39ddb]"
-                        placeholder="워크플로우 이름"
-                    />
+                    <div className="flex flex-col">
+                        <label className="text-sm text-gray-600 mb-1">워크플로우 이름</label>
+                        <input
+                            key="workflow-name-input"
+                            type="text"
+                            value={workflowName || ''}
+                            onChange={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                console.log('워크플로우 이름 변경 시도:', e.target.value);
+                                setWorkflowName(e.target.value);
+                            }}
+                            onKeyDown={(e) => {
+                                console.log('키 다운:', e.key);
+                                if (e.key === 'Backspace' || e.key === 'Delete') {
+                                    console.log('삭제 키 감지됨');
+                                }
+                            }}
+                            onKeyPress={(e) => {
+                                console.log('키 프레스:', e.key);
+                            }}
+                            onInput={(e) => {
+                                console.log('인풋 이벤트:', e.target.value);
+                            }}
+                            style={{
+                                fontSize: '18px',
+                                fontWeight: 'bold',
+                                padding: '8px 12px',
+                                border: '2px solid #ccc',
+                                borderRadius: '4px',
+                                minWidth: '300px',
+                                backgroundColor: 'white',
+                                color: 'black'
+                            }}
+                            placeholder="워크플로우 이름을 입력하세요"
+                            autoComplete="off"
+                            spellCheck="false"
+                        />
+                    </div>
                 </div>
                 <div className="flex items-center space-x-2">
                     <button

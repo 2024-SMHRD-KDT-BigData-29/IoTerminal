@@ -338,8 +338,20 @@ function WorkflowCanvas({ elements, setElements, onCyInit, selectedNodeId, selec
     // 키보드 이벤트 처리 (Delete 키로 삭제)
     useEffect(() => {
         const handleKeyDown = (event) => {
+            // 입력 필드에 포커스가 있으면 키 이벤트를 무시
+            const activeElement = document.activeElement;
+            if (activeElement && (
+                activeElement.tagName === 'INPUT' || 
+                activeElement.tagName === 'TEXTAREA' || 
+                activeElement.contentEditable === 'true'
+            )) {
+                console.log('입력 필드에 포커스가 있어서 키 이벤트 무시:', event.key);
+                return; // 입력 필드에 포커스가 있으면 아무것도 하지 않음
+            }
+
             if (event.key === 'Delete' || event.key === 'Backspace') {
                 event.preventDefault();
+                console.log('캔버스에서 삭제 키 처리:', event.key);
                 if (selectedNodeId && handleDeleteNode) {
                     handleDeleteNode(selectedNodeId);
                 } else if (selectedEdgeId && handleDeleteEdge) {

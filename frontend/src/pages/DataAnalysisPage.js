@@ -58,9 +58,7 @@ const DataAnalysisPage = () => {
             try {
                 const deviceList = await getUserDevices();
                 setDevices(deviceList);
-                if (deviceList.length > 0 && !selectedDevice) {
-                    setSelectedDevice(deviceList[0].device_id);
-                }
+                // 자동 선택 제거 - 사용자가 직접 선택하도록 함
             } catch (error) {
                 console.error('디바이스 목록 로드 실패:', error);
                 setError('디바이스 목록을 불러오는데 실패했습니다.');
@@ -507,10 +505,13 @@ const DataAnalysisPage = () => {
                 {/* 디바이스 선택 */}
                 <select
                     value={selectedDevice}
-                    onChange={(e) => setSelectedDevice(e.target.value)}
-                    className="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                    onChange={(e) => {
+                        console.log('디바이스 선택 변경:', e.target.value);
+                        setSelectedDevice(e.target.value);
+                    }}
+                    className="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 cursor-pointer hover:border-purple-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-colors"
                 >
-                    <option value="">디바이스 선택</option>
+                    <option value="">디바이스를 선택해주세요</option>
                     {devices.map(device => (
                         <option key={device.device_id} value={device.device_id}>
                             {device.name}
@@ -924,8 +925,67 @@ const DataAnalysisPage = () => {
                         }} />}
                     </div>
                 ) : (
-                    <div className="flex items-center justify-center h-[400px] text-gray-500">
-                        디바이스와 분석 옵션을 선택해주세요
+                    <div className="flex flex-col items-center justify-center h-[400px] bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                        <div className="text-center">
+                            <div className="mb-4">
+                                <svg className="mx-auto h-16 w-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                </svg>
+                            </div>
+                            <h3 className="text-lg font-medium text-gray-900 mb-2">
+                                데이터 분석을 시작하세요
+                            </h3>
+                            <p className="text-gray-500 mb-6 max-w-sm">
+                                {!selectedDevice ? 
+                                    "분석할 디바이스를 선택해주세요. 선택한 디바이스의 센서 데이터를 실시간으로 분석할 수 있습니다." :
+                                    "분석 유형을 선택하고 시간 범위를 설정해주세요."
+                                }
+                            </p>
+                            {devices.length > 0 && (
+                                <div className="space-y-3">
+                                    <p className="text-sm font-medium text-gray-700">
+                                        {!selectedDevice ? "사용 가능한 디바이스:" : "다른 디바이스 선택:"}
+                                    </p>
+                                    <div className="flex flex-wrap gap-2 justify-center">
+                                        {devices.slice(0, 4).map((device) => (
+                                            <button
+                                                key={device.device_id}
+                                                onClick={() => {
+                                                    console.log('빠른 선택 버튼 클릭:', device.device_id);
+                                                    setSelectedDevice(device.device_id);
+                                                }}
+                                                className={`px-4 py-2 rounded-lg transition-colors duration-200 text-sm ${
+                                                    selectedDevice === device.device_id
+                                                        ? 'bg-[#5e35b1] text-white border-2 border-[#7e57c2]'
+                                                        : 'bg-[#7e57c2] text-white hover:bg-[#5e35b1]'
+                                                }`}
+                                            >
+                                                {device.name}
+                                                {selectedDevice === device.device_id && (
+                                                    <span className="ml-2">✓</span>
+                                                )}
+                                            </button>
+                                        ))}
+                                        {devices.length > 4 && (
+                                            <span className="px-4 py-2 text-gray-500 text-sm">
+                                                외 {devices.length - 4}개
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                            {devices.length === 0 && (
+                                <div className="text-center">
+                                    <p className="text-gray-500 mb-4">등록된 디바이스가 없습니다.</p>
+                                    <button
+                                        onClick={() => window.location.href = '/iot/devices/management'}
+                                        className="px-4 py-2 bg-[#7e57c2] text-white rounded-lg hover:bg-[#5e35b1] transition-colors duration-200"
+                                    >
+                                        디바이스 등록하기
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>

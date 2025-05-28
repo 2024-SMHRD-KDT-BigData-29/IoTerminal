@@ -9,6 +9,7 @@ import WorkflowPage from './pages/WorkflowPage';
 import WorkflowCanvasPage from './pages/WorkflowCanvasPage';
 // import DataManagementPage from './pages/DataManagementPage';
 import IotDevicesPage from './pages/IotDevicesPage';
+import TestInputPage from './pages/TestInputPage';
 import SettingsPage from './pages/SettingsPage';
 import DataAnalysisPage from './pages/DataAnalysisPage';
 import { getCurrentUserToken } from './services/authService';
@@ -35,6 +36,7 @@ function App() {
                     <Route path="/workflow/name/:workflowName" element={<WorkflowPage />} />
                     <Route path="/workflow/new" element={<WorkflowCanvasPage />} />
                     <Route path="/workflow/edit/:workflowId" element={<WorkflowCanvasPage />} />
+                    <Route path="/test-input" element={<TestInputPage />} />
                     
                     {/* IoT 디바이스 관련 라우트 */}
                     <Route path="/iot/devices" element={<Navigate to="/iot/devices/management" replace />} />

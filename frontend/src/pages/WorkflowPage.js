@@ -5,10 +5,11 @@ import CytoscapeComponent from 'react-cytoscapejs';
 import WorkflowCanvas from '../components/workflow/WorkflowCanvas';
 import NodePalette from '../components/workflow/NodePalette';
 import PropertyEditor from '../components/workflow/PropertyEditor';
-import { Box, Plus, Save, Trash2, Upload } from 'lucide-react'; // 사용되는 아이콘만
+import { Box, Plus, Save, Trash2, Upload, Edit2, Check, X } from 'lucide-react'; // Edit2, Check, X 아이콘 추가
 import { saveWorkflow, getWorkflowList, getWorkflowById, deleteWorkflow } from '../api/workflow';
 import { getCurrentUserData } from '../services/authService';
 import { createSensor } from '../services/sensorService';
+import { API_URL } from '../config'; // API_URL import 추가
 
 function WorkflowPage() {
     const [elements, setElements] = useState([]);
@@ -28,6 +29,10 @@ function WorkflowPage() {
     const [showImportModal, setShowImportModal] = useState(false);
 
     const [workflows, setWorkflows] = useState([]);
+    
+    // 워크플로우 이름 편집 상태 관리
+    const [editingWorkflowId, setEditingWorkflowId] = useState(null);
+    const [editingName, setEditingName] = useState('');
 
     const fetchWorkflows = useCallback(async () => {
         try {
@@ -320,6 +325,70 @@ function WorkflowPage() {
         }
     };
 
+    // 워크플로우 이름 편집 시작
+    const handleStartEditName = (workflowId, currentName) => {
+        setEditingWorkflowId(workflowId);
+        setEditingName(currentName);
+    };
+
+    // 워크플로우 이름 편집 취소
+    const handleCancelEditName = () => {
+        setEditingWorkflowId(null);
+        setEditingName('');
+    };
+
+    // 워크플로우 이름 저장
+    const handleSaveWorkflowName = async (workflowId) => {
+        if (!editingName.trim()) {
+            alert('워크플로우 이름을 입력해주세요.');
+            return;
+        }
+
+        try {
+            const token = sessionStorage.getItem('token');
+            const response = await fetch(`${API_URL}/workflow/${workflowId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    name: editingName.trim()
+                })
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                // 로컬 상태 업데이트
+                setWorkflows(prevWorkflows =>
+                    prevWorkflows.map(workflow =>
+                        workflow.workflow_id === workflowId
+                            ? { ...workflow, name: editingName.trim(), updated_at: new Date().toISOString() }
+                            : workflow
+                    )
+                );
+                setEditingWorkflowId(null);
+                setEditingName('');
+                // 성공 메시지는 조용히 처리 (사용자가 이미 변경된 것을 볼 수 있음)
+            } else {
+                throw new Error(data.message || '워크플로우 이름 변경에 실패했습니다.');
+            }
+        } catch (error) {
+            console.error('워크플로우 이름 변경 실패:', error);
+            alert(error.message || '워크플로우 이름 변경에 실패했습니다.');
+        }
+    };
+
+    // 엔터키 처리
+    const handleKeyPress = (e, workflowId) => {
+        if (e.key === 'Enter') {
+            handleSaveWorkflowName(workflowId);
+        } else if (e.key === 'Escape') {
+            handleCancelEditName();
+        }
+    };
+
     if (isLoading && workflowId) {
         return (
             <div className="flex items-center justify-center h-full">
@@ -349,10 +418,48 @@ function WorkflowPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {workflows.length > 0 ? (
                         workflows.map((workflow) => (
-                            <div key={workflow.workflow_id} className="bg-white dark:bg-[#3a2e5a] rounded-xl shadow-lg p-6">
-                                <h3 className="text-lg font-semibold text-[#3a2e5a] dark:text-[#b39ddb] mb-2">
-                                    {workflow.name}
-                                </h3>
+                            <div key={workflow.workflow_id} className="bg-white dark:bg-[#3a2e5a] rounded-xl shadow-lg p-6 group">
+                                <div className="flex items-center justify-between mb-2">
+                                    {editingWorkflowId === workflow.workflow_id ? (
+                                        <div className="flex items-center space-x-2 flex-1">
+                                            <input
+                                                type="text"
+                                                value={editingName}
+                                                onChange={(e) => setEditingName(e.target.value)}
+                                                onKeyDown={(e) => handleKeyPress(e, workflow.workflow_id)}
+                                                onBlur={() => handleSaveWorkflowName(workflow.workflow_id)}
+                                                className="flex-1 text-lg font-semibold bg-transparent border-b border-[#7e57c2] focus:outline-none text-[#3a2e5a] dark:text-[#b39ddb]"
+                                                autoFocus
+                                            />
+                                            <button
+                                                onClick={() => handleSaveWorkflowName(workflow.workflow_id)}
+                                                className="p-1 text-green-600 hover:text-green-800"
+                                            >
+                                                <Check size={16} />
+                                            </button>
+                                            <button
+                                                onClick={handleCancelEditName}
+                                                className="p-1 text-red-600 hover:text-red-800"
+                                            >
+                                                <X size={16} />
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center space-x-2 flex-1">
+                                            <h3 className="text-lg font-semibold text-[#3a2e5a] dark:text-[#b39ddb] cursor-pointer hover:text-[#7e57c2] dark:hover:text-[#9575cd] transition-colors"
+                                                onClick={() => handleStartEditName(workflow.workflow_id, workflow.name)}
+                                            >
+                                                {workflow.name}
+                                            </h3>
+                                            <button
+                                                onClick={() => handleStartEditName(workflow.workflow_id, workflow.name)}
+                                                className="p-1 text-[#9575cd] hover:text-[#7e57c2] opacity-0 group-hover:opacity-100 transition-opacity"
+                                            >
+                                                <Edit2 size={14} />
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
                                 <p className="text-[#9575cd] dark:text-[#b39ddb] text-sm mb-4">
                                     마지막 수정: {new Date(workflow.updated_at).toLocaleDateString()}
                                 </p>

@@ -182,7 +182,7 @@ const IotDevicesPage = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
     const [showModal, setShowModal] = useState(false);
-    const [allSensors, setAllSensors] = useState([]);
+
 
     const reloadDevices = async () => {
         try {
@@ -190,18 +190,6 @@ const IotDevicesPage = () => {
             setError(null);
             const deviceList = await getUserDevices();
             setDevices(deviceList);
-            
-            // 모든 디바이스의 센서 정보 수집
-            const allSensorList = [];
-            for (const device of deviceList) {
-                try {
-                    const sensors = await getDeviceSensors(device.device_id);
-                    allSensorList.push(...sensors);
-                } catch (err) {
-                    console.error(`디바이스 ${device.device_id}의 센서 로드 실패:`, err);
-                }
-            }
-            setAllSensors(allSensorList);
         } catch (err) {
             setError('디바이스 목록을 불러오는데 실패했습니다.');
             console.error('디바이스 로드 오류:', err);
@@ -221,32 +209,7 @@ const IotDevicesPage = () => {
         reloadDevices();
     };
 
-    // 전체 센서 상태 분포 데이터
-    const getOverallSensorStatus = () => {
-        const statusCount = {
-            active: allSensors.filter(s => s.status === 'active').length,
-            inactive: allSensors.filter(s => s.status === 'inactive').length,
-            error: allSensors.filter(s => s.status === 'error').length
-        };
 
-        return {
-            labels: ['활성', '비활성', '오류'],
-            datasets: [{
-                data: Object.values(statusCount),
-                backgroundColor: [
-                    'rgba(75, 192, 192, 0.6)',
-                    'rgba(255, 206, 86, 0.6)',
-                    'rgba(255, 99, 132, 0.6)'
-                ],
-                borderColor: [
-                    'rgba(75, 192, 192, 1)',
-                    'rgba(255, 206, 86, 1)',
-                    'rgba(255, 99, 132, 1)'
-                ],
-                borderWidth: 1
-            }]
-        };
-    };
 
     return (
         <div className="p-6">
@@ -261,42 +224,7 @@ const IotDevicesPage = () => {
                 </button>
             </div>
 
-            {/* 전체 센서 상태 요약 */}
-            <div className="mb-6 bg-white rounded-lg shadow p-4">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">전체 센서 상태</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="h-64">
-                        <Doughnut
-                            data={getOverallSensorStatus()}
-                            options={{
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                plugins: {
-                                    legend: {
-                                        position: 'right'
-                                    }
-                                }
-                            }}
-                        />
-                    </div>
-                    <div className="flex flex-col justify-center">
-                        <div className="space-y-2">
-                            <div className="flex items-center">
-                                <div className="w-4 h-4 rounded-full bg-[rgba(75,192,192,0.6)] mr-2"></div>
-                                <span className="text-sm">활성: {allSensors.filter(s => s.status === 'active').length}개</span>
-                            </div>
-                            <div className="flex items-center">
-                                <div className="w-4 h-4 rounded-full bg-[rgba(255,206,86,0.6)] mr-2"></div>
-                                <span className="text-sm">비활성: {allSensors.filter(s => s.status === 'inactive').length}개</span>
-                            </div>
-                            <div className="flex items-center">
-                                <div className="w-4 h-4 rounded-full bg-[rgba(255,99,132,0.6)] mr-2"></div>
-                                <span className="text-sm">오류: {allSensors.filter(s => s.status === 'error').length}개</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+
 
             <Modal open={showModal} onClose={handleCloseModal}>
                 <h3 className="text-xl font-bold mb-4 text-[#3a2e5a] dark:text-[#b39ddb]">디바이스 등록</h3>
