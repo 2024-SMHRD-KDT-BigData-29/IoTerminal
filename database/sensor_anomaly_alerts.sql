@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS sensor_thresholds (
     id INT AUTO_INCREMENT PRIMARY KEY,
     sensor_type ENUM('mq4', 'mq136', 'mq137', 'temperature', 'humidity') NOT NULL UNIQUE,
     sensor_name VARCHAR(100) NOT NULL,
+    sensor_location VARCHAR(255) DEFAULT NULL COMMENT '센서 위치 또는 설명',
     unit VARCHAR(20) NOT NULL,
     normal_min DECIMAL(10,2) NOT NULL,
     normal_max DECIMAL(10,2) NOT NULL,

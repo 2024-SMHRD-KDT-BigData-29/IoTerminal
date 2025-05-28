@@ -10,22 +10,14 @@ class SensorAnomalyService {
     // 센서 데이터 이상치 검사
     async checkSensorAnomalies(sensorData) {
         try {
-            const { mq4, mq136, mq137, temperature, humidity, farmno = '1', zone = 'A' } = sensorData;
+            const { mq4, mq136, mq137, farmno = '1', zone = 'A' } = sensorData;
             
-            // 각 센서별로 이상치 검사
+            // 가스 센서 3개만 이상치 검사
             const sensors = [
                 { type: 'mq4', name: '메탄 가스 센서', value: mq4 },
                 { type: 'mq136', name: '황화수소 가스 센서', value: mq136 },
                 { type: 'mq137', name: '암모니아 가스 센서', value: mq137 }
             ];
-
-            // 온도, 습도가 있는 경우 추가
-            if (temperature !== null && temperature !== undefined) {
-                sensors.push({ type: 'temperature', name: '온도 센서', value: temperature });
-            }
-            if (humidity !== null && humidity !== undefined) {
-                sensors.push({ type: 'humidity', name: '습도 센서', value: humidity });
-            }
 
             const alerts = [];
 
@@ -352,6 +344,22 @@ class SensorAnomalyService {
             return result.affectedRows > 0;
         } catch (error) {
             console.error('알림 해결 처리 오류:', error);
+            throw error;
+        }
+    }
+
+    // 모든 미해결 알림 해결 처리
+    async resolveAllAlerts(farmno = '1', zone = 'A') {
+        try {
+            const [result] = await db.query(
+                'UPDATE sensor_anomaly_alerts SET is_resolved = TRUE, resolved_at = NOW() WHERE is_resolved = FALSE AND farmno = ? AND zone = ?',
+                [farmno, zone]
+            );
+
+            console.log(`✅ ${result.affectedRows}개의 알림이 해결 처리되었습니다. (농장: ${farmno}, 구역: ${zone})`);
+            return result.affectedRows;
+        } catch (error) {
+            console.error('모든 알림 해결 처리 오류:', error);
             throw error;
         }
     }
