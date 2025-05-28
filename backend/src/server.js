@@ -178,16 +178,14 @@ const startDataInsertion = () => {
                 mq4: parseFloat(dbValues.mq4.toFixed(1)),
                 mq136: parseFloat(dbValues.mq136.toFixed(1)),
                 mq137: parseFloat(dbValues.mq137.toFixed(1)),
-                temperature: null, // NULL로 설정
-                humidity: null, // NULL로 설정
                 farmno: '1',
                 zone: 'A'
             };
             
-            // DB에 데이터 삽입
+            // DB에 데이터 삽입 (가스 센서 3개만)
             await db.query(
-                'INSERT INTO sensor (dt, mq4, mq136, mq137, temperature, humidity, farmno, zone) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                [sensorData.dt, sensorData.mq4, sensorData.mq136, sensorData.mq137, sensorData.temperature, sensorData.humidity, sensorData.farmno, sensorData.zone]
+                'INSERT INTO sensor (dt, mq4, mq136, mq137, farmno, zone) VALUES (?, ?, ?, ?, ?, ?)',
+                [sensorData.dt, sensorData.mq4, sensorData.mq136, sensorData.mq137, sensorData.farmno, sensorData.zone]
             );
             
             console.log('💾 새로운 센서 데이터 DB 삽입:', sensorData);

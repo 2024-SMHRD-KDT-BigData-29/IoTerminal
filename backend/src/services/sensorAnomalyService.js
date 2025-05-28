@@ -360,9 +360,139 @@ class SensorAnomalyService {
     async getThresholds() {
         try {
             const [thresholds] = await db.query('SELECT * FROM sensor_thresholds ORDER BY sensor_type');
+            
+            // 임계값이 없으면 기본 임계값 생성
+            if (thresholds.length === 0) {
+                console.log('임계값 설정이 없습니다. 기본 임계값을 생성합니다...');
+                await this.createDefaultThresholds();
+                const [newThresholds] = await db.query('SELECT * FROM sensor_thresholds ORDER BY sensor_type');
+                return newThresholds;
+            }
+            
             return thresholds;
         } catch (error) {
             console.error('임계값 설정 조회 오류:', error);
+            throw error;
+        }
+    }
+
+    // 기본 임계값 생성
+    async createDefaultThresholds() {
+        try {
+            const defaultThresholds = [
+                {
+                    sensor_type: 'mq4',
+                    sensor_name: '메탄 가스 센서',
+                    unit: 'ppm',
+                    normal_min: 5.0,
+                    normal_max: 35.0,
+                    warning_min: 3.0,
+                    warning_max: 45.0,
+                    critical_min: 1.0,
+                    critical_max: 60.0,
+                    spike_threshold: 15.0
+                },
+                {
+                    sensor_type: 'mq136',
+                    sensor_name: '황화수소 가스 센서',
+                    unit: 'ppm',
+                    normal_min: 8.0,
+                    normal_max: 45.0,
+                    warning_min: 5.0,
+                    warning_max: 55.0,
+                    critical_min: 2.0,
+                    critical_max: 70.0,
+                    spike_threshold: 20.0
+                },
+                {
+                    sensor_type: 'mq137',
+                    sensor_name: '암모니아 가스 센서',
+                    unit: 'ppm',
+                    normal_min: 2.0,
+                    normal_max: 25.0,
+                    warning_min: 1.0,
+                    warning_max: 35.0,
+                    critical_min: 0.5,
+                    critical_max: 45.0,
+                    spike_threshold: 12.0
+                }
+            ];
+
+            for (const threshold of defaultThresholds) {
+                await db.query(
+                    `INSERT INTO sensor_thresholds 
+                    (sensor_type, sensor_name, unit, normal_min, normal_max, warning_min, warning_max, critical_min, critical_max, spike_threshold) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [
+                        threshold.sensor_type,
+                        threshold.sensor_name,
+                        threshold.unit,
+                        threshold.normal_min,
+                        threshold.normal_max,
+                        threshold.warning_min,
+                        threshold.warning_max,
+                        threshold.critical_min,
+                        threshold.critical_max,
+                        threshold.spike_threshold
+                    ]
+                );
+            }
+
+            console.log('✅ 기본 임계값 설정이 생성되었습니다.');
+        } catch (error) {
+            console.error('기본 임계값 생성 오류:', error);
+            throw error;
+        }
+    }
+
+    // 새로운 센서 임계값 생성
+    async createThreshold(thresholdData) {
+        try {
+            const {
+                sensor_type,
+                sensor_name,
+                unit,
+                normal_min,
+                normal_max,
+                warning_min,
+                warning_max,
+                critical_min,
+                critical_max,
+                spike_threshold
+            } = thresholdData;
+
+            // 센서 타입 중복 체크
+            const [existingThreshold] = await db.query(
+                'SELECT id FROM sensor_thresholds WHERE sensor_type = ?',
+                [sensor_type]
+            );
+
+            if (existingThreshold.length > 0) {
+                throw new Error(`센서 타입 '${sensor_type}'이 이미 존재합니다.`);
+            }
+
+            const [result] = await db.query(
+                `INSERT INTO sensor_thresholds 
+                (sensor_type, sensor_name, unit, normal_min, normal_max, warning_min, warning_max, critical_min, critical_max, spike_threshold) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    sensor_type,
+                    sensor_name,
+                    unit,
+                    normal_min,
+                    normal_max,
+                    warning_min,
+                    warning_max,
+                    critical_min,
+                    critical_max,
+                    spike_threshold
+                ]
+            );
+
+            console.log(`✅ 새로운 센서 임계값 생성: ${sensor_name} (${sensor_type})`);
+            return result.insertId;
+        } catch (error) {
+            console.error('임계값 생성 오류:', error);
             throw error;
         }
     }
@@ -481,6 +611,26 @@ class SensorAnomalyService {
         } else {
             // 자정을 넘나드는 경우
             return currentTime >= startTime || currentTime <= endTime;
+        }
+    }
+
+    // 센서 임계값 삭제
+    async deleteThreshold(sensorType) {
+        try {
+            const [result] = await db.query(
+                'DELETE FROM sensor_thresholds WHERE sensor_type = ?',
+                [sensorType]
+            );
+
+            if (result.affectedRows > 0) {
+                console.log(`✅ 센서 임계값 삭제: ${sensorType}`);
+                return true;
+            } else {
+                return false;
+            }
+        } catch (error) {
+            console.error('임계값 삭제 오류:', error);
+            throw error;
         }
     }
 }

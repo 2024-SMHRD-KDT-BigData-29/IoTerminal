@@ -32,7 +32,16 @@ const MainLayout = () => {
                 { path: '/iot/devices/analysis', text: '데이터 분석' }
             ]
         },
-        { path: '/settings', icon: <Settings size={20} />, text: '설정' }
+        {
+            path: '/sensor-alerts',
+            icon: <Bell size={20} />,
+            text: '센서 알림',
+            submenu: [
+                { path: '/sensor-alerts/history', text: '알림 히스토리' },
+                { path: '/settings', text: '알림 설정' }
+            ]
+        },
+        { path: '/account', icon: <Settings size={20} />, text: '설정' }
     ];
 
     // 디버깅: menuItemsData 확인
@@ -199,7 +208,7 @@ const MainLayout = () => {
                                             </div>
                                             <hr className="border-gray-200 dark:border-[#4a3f6d]"/>
                                             <Link
-                                                to="/settings"
+                                                to="/account"
                                                 className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#4a3f6d]"
                                                 onClick={() => setProfileDropdownOpen(false)}
                                             >

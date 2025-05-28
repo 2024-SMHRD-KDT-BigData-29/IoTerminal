@@ -11,7 +11,9 @@ import WorkflowCanvasPage from './pages/WorkflowCanvasPage';
 import IotDevicesPage from './pages/IotDevicesPage';
 import TestInputPage from './pages/TestInputPage';
 import SettingsPage from './pages/SettingsPage';
+import NotificationSettingsPage from './pages/settings/NotificationSettingsPage';
 import DataAnalysisPage from './pages/DataAnalysisPage';
+import SensorAlertHistoryPage from './pages/SensorAlertHistoryPage';
 import { getCurrentUserToken } from './services/authService';
 
 const PrivateRoutes = () => {
@@ -43,7 +45,14 @@ function App() {
                     <Route path="/iot/devices/management" element={<IotDevicesPage />} />
                     <Route path="/iot/devices/analysis" element={<DataAnalysisPage />} />
                     
-                    <Route path="/settings" element={<SettingsPage />} />
+                    {/* 센서 알림 설정 라우트 */}
+                    <Route path="/sensor-alerts/settings" element={<NotificationSettingsPage />} />
+                    <Route path="/sensor-alerts/history" element={<SensorAlertHistoryPage />} />
+                    <Route path="/sensor-alerts" element={<Navigate to="/sensor-alerts/history" replace />} />
+                    
+                    {/* 설정 관련 라우트 */}
+                    <Route path="/settings" element={<NotificationSettingsPage />} />
+                    <Route path="/account" element={<SettingsPage />} />
                 </Route>
 
                 {/* Fallback Routes */}

@@ -219,6 +219,18 @@ class SensorAlertService {
         }
     }
 
+    // 모든 미해결 알림 해결 처리
+    async resolveAllAlerts(farmno = '1', zone = 'A') {
+        try {
+            const response = await api.put(`/sensor-alerts/alerts/resolve-all?farmno=${farmno}&zone=${zone}`);
+            this.notifyListeners('all_alerts_resolved', { farmno, zone });
+            return response.data;
+        } catch (error) {
+            console.error('모든 알림 해결 처리 실패:', error);
+            throw error;
+        }
+    }
+
     // 센서 임계값 설정 조회
     async getThresholds() {
         try {
@@ -226,6 +238,18 @@ class SensorAlertService {
             return response.data.data;
         } catch (error) {
             console.error('센서 임계값 설정 조회 실패:', error);
+            throw error;
+        }
+    }
+
+    // 새로운 센서 임계값 생성
+    async createThreshold(thresholdData) {
+        try {
+            const response = await api.post('/sensor-alerts/thresholds', thresholdData);
+            this.notifyListeners('threshold_created', thresholdData);
+            return response.data;
+        } catch (error) {
+            console.error('센서 임계값 생성 실패:', error);
             throw error;
         }
     }
@@ -238,6 +262,18 @@ class SensorAlertService {
             return response.data;
         } catch (error) {
             console.error('센서 임계값 설정 업데이트 실패:', error);
+            throw error;
+        }
+    }
+
+    // 센서 임계값 삭제
+    async deleteThreshold(sensorType) {
+        try {
+            const response = await api.delete(`/sensor-alerts/thresholds/${sensorType}`);
+            this.notifyListeners('threshold_deleted', { sensorType });
+            return response.data;
+        } catch (error) {
+            console.error('센서 임계값 삭제 실패:', error);
             throw error;
         }
     }
@@ -279,13 +315,13 @@ class SensorAlertService {
         }
     }
 
-    // 센서 알림 통계 조회
-    async getStats(days = 7) {
+    // 알림 통계 조회
+    async getStats(period = '7d') {
         try {
-            const response = await api.get(`/sensor-alerts/stats?days=${days}`);
+            const response = await api.get(`/sensor-alerts/stats?period=${period}`);
             return response.data.data;
         } catch (error) {
-            console.error('센서 알림 통계 조회 실패:', error);
+            console.error('알림 통계 조회 실패:', error);
             throw error;
         }
     }
@@ -343,51 +379,73 @@ class SensorAlertService {
         const sensorNames = {
             'mq4': '메탄 가스',
             'mq136': '황화수소 가스',
-            'mq137': '암모니아 가스',
-            'temperature': '온도',
-            'humidity': '습도'
+            'mq137': '암모니아 가스'
         };
         return sensorNames[sensorType] || sensorType;
     }
 
-    // 알림 타입별 설명 반환
+    // 알림 타입 설명 반환
     getAlertTypeDescription(alertType) {
         const descriptions = {
-            'threshold_high': '임계값 초과',
-            'threshold_low': '임계값 미달',
-            'sudden_spike': '급격한 상승',
-            'sudden_drop': '급격한 하락',
-            'data_missing': '데이터 누락',
-            'sensor_malfunction': '센서 오작동'
+            'threshold_violation': '임계값 위반',
+            'rapid_change': '급격한 변화',
+            'sensor_malfunction': '센서 오작동',
+            'data_missing': '데이터 누락'
         };
         return descriptions[alertType] || alertType;
     }
 
     // 시간 포맷팅
     formatTime(timestamp) {
-        const now = new Date();
-        const alertTime = new Date(timestamp);
-        const diffMs = now - alertTime;
-        const diffMinutes = Math.floor(diffMs / (1000 * 60));
-        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        try {
+            if (!timestamp) {
+                return '시간 정보 없음';
+            }
 
-        if (diffMinutes < 1) {
-            return '방금 전';
-        } else if (diffMinutes < 60) {
-            return `${diffMinutes}분 전`;
-        } else if (diffHours < 24) {
-            return `${diffHours}시간 전`;
-        } else if (diffDays < 7) {
-            return `${diffDays}일 전`;
-        } else {
-            return alertTime.toLocaleDateString('ko-KR', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
+            // 다양한 형태의 timestamp 처리
+            let date;
+            if (typeof timestamp === 'string') {
+                // ISO 문자열이나 다른 형태의 문자열 처리
+                date = new Date(timestamp);
+            } else if (typeof timestamp === 'number') {
+                // Unix timestamp 처리 (초 단위인 경우 밀리초로 변환)
+                date = timestamp < 10000000000 ? new Date(timestamp * 1000) : new Date(timestamp);
+            } else {
+                date = new Date(timestamp);
+            }
+
+            // Invalid Date 체크
+            if (isNaN(date.getTime())) {
+                console.warn('Invalid timestamp:', timestamp);
+                return '시간 정보 오류';
+            }
+
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+
+            if (diffMins < 1) {
+                return '방금 전';
+            } else if (diffMins < 60) {
+                return `${diffMins}분 전`;
+            } else if (diffHours < 24) {
+                return `${diffHours}시간 전`;
+            } else if (diffDays < 7) {
+                return `${diffDays}일 전`;
+            } else {
+                return date.toLocaleDateString('ko-KR', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            }
+        } catch (error) {
+            console.error('시간 포맷팅 오류:', error, 'timestamp:', timestamp);
+            return '시간 정보 오류';
         }
     }
 }

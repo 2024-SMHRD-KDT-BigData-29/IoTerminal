@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { AlertTriangle, X, Check, Settings, TestTube } from 'lucide-react';
+import { AlertTriangle, X, Check, Settings, TestTube, CheckCheck } from 'lucide-react';
 import sensorAlertService from '../../services/sensorAlertService';
 
 const SensorAlertDropdown = () => {
@@ -7,6 +7,7 @@ const SensorAlertDropdown = () => {
     const [alerts, setAlerts] = useState([]);
     const [unresolvedCount, setUnresolvedCount] = useState(0);
     const [loading, setLoading] = useState(false);
+    const [resolvingAll, setResolvingAll] = useState(false);
     const dropdownRef = useRef(null);
 
     // 컴포넌트 마운트 시 초기화
@@ -58,9 +59,19 @@ const SensorAlertDropdown = () => {
                 offset: 0,
                 resolved: false // 미해결 알림만
             });
-            setAlerts(response.data.alerts);
+            
+            console.log('API 응답:', response); // 디버깅용
+            
+            // API 응답 구조 확인 후 올바른 데이터 추출
+            const alertsData = response?.data?.alerts || response?.alerts || [];
+            const unresolvedCountData = response?.data?.unresolved_count || response?.unresolved_count || 0;
+            
+            setAlerts(Array.isArray(alertsData) ? alertsData : []);
+            setUnresolvedCount(unresolvedCountData);
         } catch (error) {
             console.error('센서 알림 로드 실패:', error);
+            setAlerts([]);
+            setUnresolvedCount(0);
         } finally {
             setLoading(false);
         }
@@ -88,13 +99,38 @@ const SensorAlertDropdown = () => {
         setUnresolvedCount(prev => Math.max(0, prev - 1));
     };
 
-    // 알림 해결 처리
+    // 개별 알림 해결 처리
     const handleResolveAlert = async (alertId, event) => {
         event.stopPropagation();
         try {
             await sensorAlertService.resolveAlert(alertId);
         } catch (error) {
             console.error('알림 해결 처리 실패:', error);
+        }
+    };
+
+    // 모든 알림 해결 처리
+    const handleResolveAllAlerts = async () => {
+        if (alerts.length === 0) return;
+        
+        try {
+            setResolvingAll(true);
+            
+            // 새로운 API를 사용하여 한 번에 모든 알림 해결
+            const response = await sensorAlertService.resolveAllAlerts('1', 'A');
+            
+            // 상태 업데이트
+            setAlerts([]);
+            setUnresolvedCount(0);
+            
+            console.log(`✅ ${response.data.resolved_count}개의 알림이 해결되었습니다.`);
+            
+        } catch (error) {
+            console.error('모든 알림 해결 처리 실패:', error);
+            // 실패 시 다시 로드
+            await loadAlerts();
+        } finally {
+            setResolvingAll(false);
         }
     };
 
@@ -134,6 +170,20 @@ const SensorAlertDropdown = () => {
                                 센서 이상치 알림
                             </h3>
                             <div className="flex items-center space-x-2">
+                                {alerts.length > 0 && (
+                                    <button
+                                        onClick={handleResolveAllAlerts}
+                                        disabled={resolvingAll}
+                                        className="p-1 hover:bg-gray-100 dark:hover:bg-[#4a3f6d] rounded transition-colors disabled:opacity-50"
+                                        title="모든 알림 해결"
+                                    >
+                                        {resolvingAll ? (
+                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-500"></div>
+                                        ) : (
+                                            <CheckCheck size={16} className="text-green-600 dark:text-green-400" />
+                                        )}
+                                    </button>
+                                )}
                                 <button
                                     onClick={handleCreateTestAlert}
                                     className="p-1 hover:bg-gray-100 dark:hover:bg-[#4a3f6d] rounded transition-colors"
@@ -142,7 +192,7 @@ const SensorAlertDropdown = () => {
                                     <TestTube size={16} className="text-gray-600 dark:text-gray-400" />
                                 </button>
                                 <button
-                                    onClick={() => window.location.href = '/sensor-alerts/settings'}
+                                    onClick={() => window.location.href = '/settings'}
                                     className="p-1 hover:bg-gray-100 dark:hover:bg-[#4a3f6d] rounded transition-colors"
                                     title="알림 설정"
                                 >
@@ -234,15 +284,31 @@ const SensorAlertDropdown = () => {
                     {/* 푸터 */}
                     {alerts.length > 0 && (
                         <div className="p-3 border-t border-gray-200 dark:border-[#4a3f6d] bg-gray-50 dark:bg-[#2a2139]">
-                            <button
-                                onClick={() => {
-                                    setIsOpen(false);
-                                    window.location.href = '/sensor-alerts';
-                                }}
-                                className="w-full text-center text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-medium"
-                            >
-                                모든 센서 알림 보기
-                            </button>
+                            <div className="flex space-x-2">
+                                <button
+                                    onClick={() => {
+                                        setIsOpen(false);
+                                        window.location.href = '/sensor-alerts';
+                                    }}
+                                    className="flex-1 text-center text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium py-2 px-3 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                                >
+                                    모든 센서 알림 보기
+                                </button>
+                                <button
+                                    onClick={handleResolveAllAlerts}
+                                    disabled={resolvingAll}
+                                    className="flex-1 text-center text-sm text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 font-medium py-2 px-3 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {resolvingAll ? (
+                                        <div className="flex items-center justify-center">
+                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-500 mr-2"></div>
+                                            처리 중...
+                                        </div>
+                                    ) : (
+                                        '모든 알림 해결'
+                                    )}
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>

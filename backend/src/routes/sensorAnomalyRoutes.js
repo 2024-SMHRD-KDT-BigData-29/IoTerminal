@@ -102,6 +102,27 @@ router.put('/alerts/:id/resolve', authenticateUser, async (req, res) => {
     }
 });
 
+// 모든 미해결 알림 해결 처리
+router.put('/alerts/resolve-all', authenticateUser, async (req, res) => {
+    try {
+        const { farmno = '1', zone = 'A' } = req.query;
+        const resolvedCount = await sensorAnomalyService.resolveAllAlerts(farmno, zone);
+        
+        res.json({
+            success: true,
+            message: `${resolvedCount}개의 알림이 해결 처리되었습니다.`,
+            data: { resolved_count: resolvedCount }
+        });
+    } catch (error) {
+        console.error('모든 알림 해결 처리 오류:', error);
+        res.status(500).json({
+            success: false,
+            message: '모든 알림을 해결 처리하는 중 오류가 발생했습니다.',
+            error: error.message
+        });
+    }
+});
+
 // 센서 임계값 설정 조회
 router.get('/thresholds', authenticateUser, async (req, res) => {
     try {
@@ -116,6 +137,26 @@ router.get('/thresholds', authenticateUser, async (req, res) => {
         res.status(500).json({
             success: false,
             message: '센서 임계값 설정을 조회하는 중 오류가 발생했습니다.',
+            error: error.message
+        });
+    }
+});
+
+// 새로운 센서 임계값 생성
+router.post('/thresholds', authenticateUser, async (req, res) => {
+    try {
+        const thresholdId = await sensorAnomalyService.createThreshold(req.body);
+        
+        res.json({
+            success: true,
+            message: '새로운 센서 임계값이 생성되었습니다.',
+            data: { id: thresholdId }
+        });
+    } catch (error) {
+        console.error('센서 임계값 생성 오류:', error);
+        res.status(500).json({
+            success: false,
+            message: '센서 임계값을 생성하는 중 오류가 발생했습니다.',
             error: error.message
         });
     }
@@ -143,6 +184,33 @@ router.put('/thresholds/:sensorType', authenticateUser, async (req, res) => {
         res.status(500).json({
             success: false,
             message: '센서 임계값 설정을 업데이트하는 중 오류가 발생했습니다.',
+            error: error.message
+        });
+    }
+});
+
+// 센서 임계값 삭제
+router.delete('/thresholds/:sensorType', authenticateUser, async (req, res) => {
+    try {
+        const { sensorType } = req.params;
+        const success = await sensorAnomalyService.deleteThreshold(sensorType);
+        
+        if (success) {
+            res.json({
+                success: true,
+                message: '센서 임계값이 삭제되었습니다.'
+            });
+        } else {
+            res.status(404).json({
+                success: false,
+                message: '해당 센서를 찾을 수 없습니다.'
+            });
+        }
+    } catch (error) {
+        console.error('센서 임계값 삭제 오류:', error);
+        res.status(500).json({
+            success: false,
+            message: '센서 임계값을 삭제하는 중 오류가 발생했습니다.',
             error: error.message
         });
     }
@@ -224,30 +292,89 @@ router.post('/test-alert', authenticateUser, async (req, res) => {
     }
 });
 
-// 센서별 최근 알림 통계
+// 센서 알림 통계 조회 (히스토리 페이지용)
 router.get('/stats', authenticateUser, async (req, res) => {
     try {
-        const { farmno = '1', zone = 'A', days = 7 } = req.query;
+        const { period = '7d', farmno = '1', zone = 'A' } = req.query;
         
-        // 최근 N일간의 센서별 알림 통계 조회
+        let dateCondition = '';
+        switch (period) {
+            case '1d':
+                dateCondition = 'AND created_at >= DATE_SUB(NOW(), INTERVAL 1 DAY)';
+                break;
+            case '7d':
+                dateCondition = 'AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)';
+                break;
+            case '30d':
+                dateCondition = 'AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)';
+                break;
+            default:
+                dateCondition = 'AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)';
+        }
+
         const db = require('../config/database');
-        const [stats] = await db.query(`
+
+        // 전체 통계
+        const [totalStats] = await db.query(`
+            SELECT 
+                COUNT(*) as total_alerts,
+                COUNT(CASE WHEN is_resolved = 0 THEN 1 END) as unresolved_alerts,
+                COUNT(CASE WHEN severity = 'critical' THEN 1 END) as critical_alerts,
+                COUNT(CASE WHEN severity = 'high' THEN 1 END) as high_alerts,
+                COUNT(CASE WHEN severity = 'medium' THEN 1 END) as medium_alerts,
+                COUNT(CASE WHEN severity = 'low' THEN 1 END) as low_alerts
+            FROM sensor_anomaly_alerts 
+            WHERE farmno = ? AND zone = ? ${dateCondition}
+        `, [farmno, zone]);
+
+        // 센서별 통계
+        const [sensorStats] = await db.query(`
             SELECT 
                 sensor_type,
                 sensor_name,
-                severity,
                 COUNT(*) as alert_count,
-                MAX(created_at) as last_alert_time
+                COUNT(CASE WHEN is_resolved = 0 THEN 1 END) as unresolved_count,
+                COUNT(CASE WHEN severity = 'critical' THEN 1 END) as critical_count
+            FROM sensor_anomaly_alerts 
+            WHERE farmno = ? AND zone = ? ${dateCondition}
+            GROUP BY sensor_type, sensor_name
+            ORDER BY alert_count DESC
+        `, [farmno, zone]);
+
+        // 일별 알림 수 (최근 7일)
+        const [dailyStats] = await db.query(`
+            SELECT 
+                DATE(created_at) as date,
+                COUNT(*) as alert_count,
+                COUNT(CASE WHEN severity = 'critical' THEN 1 END) as critical_count
             FROM sensor_anomaly_alerts 
             WHERE farmno = ? AND zone = ? 
-            AND created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
-            GROUP BY sensor_type, sensor_name, severity
-            ORDER BY sensor_type, severity
-        `, [farmno, zone, parseInt(days)]);
-        
+            AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+            GROUP BY DATE(created_at)
+            ORDER BY date DESC
+        `, [farmno, zone]);
+
+        // 알림 타입별 통계
+        const [typeStats] = await db.query(`
+            SELECT 
+                alert_type,
+                COUNT(*) as count,
+                COUNT(CASE WHEN severity = 'critical' THEN 1 END) as critical_count
+            FROM sensor_anomaly_alerts 
+            WHERE farmno = ? AND zone = ? ${dateCondition}
+            GROUP BY alert_type
+            ORDER BY count DESC
+        `, [farmno, zone]);
+
         res.json({
             success: true,
-            data: stats
+            data: {
+                total: totalStats[0],
+                by_sensor: sensorStats,
+                daily: dailyStats,
+                by_type: typeStats,
+                period: period
+            }
         });
     } catch (error) {
         console.error('센서 알림 통계 조회 오류:', error);
