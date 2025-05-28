@@ -216,10 +216,54 @@ class NotificationService {
                 templateKey,
                 customData
             });
+            
+            // 브라우저 알림 표시
+            if (response.data.showBrowserNotification && response.data.notificationData) {
+                await this.showTestBrowserNotification(response.data.notificationData);
+            }
+            
             return response.data;
         } catch (error) {
             console.error('테스트 알림 생성 실패:', error);
             throw error;
+        }
+    }
+
+    // 테스트용 브라우저 알림 표시
+    async showTestBrowserNotification(notificationData) {
+        // 브라우저 알림 권한 요청
+        if (!('Notification' in window)) {
+            console.log('이 브라우저는 데스크톱 알림을 지원하지 않습니다.');
+            return;
+        }
+
+        if (Notification.permission === 'default') {
+            const permission = await Notification.requestPermission();
+            if (permission !== 'granted') {
+                console.log('알림 권한이 거부되었습니다.');
+                return;
+            }
+        }
+
+        if (Notification.permission === 'granted') {
+            const browserNotification = new Notification(notificationData.title, {
+                body: notificationData.message,
+                icon: notificationData.icon || '/favicon.ico',
+                tag: `test-notification-${Date.now()}`,
+                badge: '/favicon.ico',
+                requireInteraction: notificationData.requireInteraction || false
+            });
+
+            // 클릭 시 창 포커스
+            browserNotification.onclick = () => {
+                window.focus();
+                browserNotification.close();
+            };
+
+            // 자동 닫기 (5초 후)
+            setTimeout(() => {
+                browserNotification.close();
+            }, 5000);
         }
     }
 

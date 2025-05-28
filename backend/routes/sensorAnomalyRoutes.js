@@ -1,3 +1,6 @@
+const express = require('express');
+const router = express.Router();
+
 // 알림 통계 조회
 router.get('/stats', async (req, res) => {
     try {
