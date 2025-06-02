@@ -1,7 +1,7 @@
 # IoTerminal (팀명: 이김손)
 
 <div align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=9B6B9E&height=300&section=header&text=IoTerminal&fontSize=90&animation=fadeIn&fontAlignY=38&desc=IoT%20빅데이터%20수집%20및%20관리%20시스템&descAlignY=55&descAlign=50"/>
+  <img src="https://capsule-render.vercel.app/api?type=venom&color=9B6B9E&height=300&section=header&text=IoTerminal&fontSize=90&animation=fadeIn&fontAlignY=38&desc=IoT%20빅데이터%20수집%20및%20관리%20시스템&descAlignY=55&descAlign=50"/>
 </div>
 
 <style>
@@ -31,10 +31,22 @@
     transform: translateY(-5px);
     transition: transform 0.3s ease;
   }
+  .section {
+    opacity: 0;
+    animation: fadeIn 1s ease-in forwards;
+  }
+  .section:nth-child(1) { animation-delay: 0.1s; }
+  .section:nth-child(2) { animation-delay: 0.2s; }
+  .section:nth-child(3) { animation-delay: 0.3s; }
+  .section:nth-child(4) { animation-delay: 0.4s; }
+  .section:nth-child(5) { animation-delay: 0.5s; }
+  .section:nth-child(6) { animation-delay: 0.6s; }
+  .section:nth-child(7) { animation-delay: 0.7s; }
+  .section:nth-child(8) { animation-delay: 0.8s; }
 </style>
 
+<div class="section">
 ## 📋 목차
-<div class="animate-fade-in">
 - [서비스 소개](#-서비스-소개)
 - [프로젝트 기간](#-프로젝트-기간)
 - [주요 기능](#-주요-기능)
@@ -45,19 +57,24 @@
 - [트러블슈팅](#-트러블슈팅)
 </div>
 
+<div class="section">
 ## 👀 서비스 소개
-<div align="center" class="animate-slide-in">
+<div align="center">
   <h3 style="color: #9B6B9E;">IoT 빅데이터 수집 및 관리 시스템</h3>
   <p>실시간 IoT 센서 데이터 수집, 분석, 관리의 모든 것을 한 곳에서</p>
 </div>
-
-## 📅 프로젝트 기간
-<div align="center" class="animate-fade-in">
-  <img src="https://img.shields.io/badge/기간-2025.04.22~2025.06.04-9B6B9E"/>
 </div>
 
+<div class="section">
+## 📅 프로젝트 기간
+<div align="center">
+  <img src="https://img.shields.io/badge/기간-2025.04.22~2025.06.04-9B6B9E"/>
+</div>
+</div>
+
+<div class="section">
 ## ⭐ 주요 기능
-<div align="center" class="animate-slide-in">
+<div align="center">
   <table>
     <tr>
       <td align="center" class="hover-effect">
@@ -78,9 +95,11 @@
     </tr>
   </table>
 </div>
+</div>
 
+<div class="section">
 ## ⛏ 기술 스택
-<div align="center" class="animate-fade-in">
+<div align="center">
   <table>
     <tr>
       <th style="background-color: #F5F0F7;">구분</th>
@@ -134,14 +153,18 @@
     </tr>
   </table>
 </div>
-
-## ⚙ 시스템 아키텍처
-<div align="center" class="animate-slide-in">
-  <img src="./image/system_arc.png" alt="시스템 아키텍처" width="800" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(155, 107, 158, 0.2);" class="hover-effect"/>
 </div>
 
+<div class="section">
+## ⚙ 시스템 아키텍처
+<div align="center">
+  <img src="./image/system_arc.png" alt="시스템 아키텍처" width="800" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(155, 107, 158, 0.2);" class="hover-effect"/>
+</div>
+</div>
+
+<div class="section">
 ## 📌 시스템 설계
-<div align="center" class="animate-fade-in">
+<div align="center">
   <table>
     <tr>
       <td align="center">
@@ -164,9 +187,11 @@
     </tr>
   </table>
 </div>
+</div>
 
+<div class="section">
 ## 🖥 화면 구성
-<div align="center" class="animate-slide-in">
+<div align="center">
   <table>
     <tr>
       <td align="center">
@@ -206,9 +231,11 @@
     </tr>
   </table>
 </div>
+</div>
 
+<div class="section">
 ## 👨‍👩‍👦‍👦 팀원 소개
-<div align="center" class="animate-fade-in">
+<div align="center">
   <table>
     <tr>
       <td align="center" class="hover-effect">
@@ -258,9 +285,11 @@
     </tr>
   </table>
 </div>
+</div>
 
+<div class="section">
 ## 🤾‍♂️ 트러블슈팅
-<div align="center" class="animate-slide-in">
+<div align="center">
   <table>
     <tr>
       <td align="center">
@@ -271,4 +300,5 @@
       </td>
     </tr>
   </table>
+</div>
 </div>
