@@ -1,0 +1,2 @@
+private/*.png filter=lfs diff=lfs merge=lfs -text
+private/*.jpg filter=lfs diff=lfs merge=lfs -text
