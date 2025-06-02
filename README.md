@@ -82,7 +82,7 @@
 <br>
 
 ## 📌 SW유스케이스
-![센서 시스템 구조도](./image/)<br>
+![image](./image/USECASE.png)<br>
 
 ## 📌 서비스 흐름도
 ![image](./image/service_flows.png)
