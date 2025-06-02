@@ -150,10 +150,8 @@
 
 ## 🤾‍♂️ 트러블슈팅
   
-* 문제1<br>
  ![image](./image/trouble.png)
 <br>
  
-* 문제2<br>
  ![image](./image/trouble2.png)
 <br>
