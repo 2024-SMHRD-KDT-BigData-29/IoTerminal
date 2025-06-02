@@ -1,5 +1,7 @@
 #  IoTerminal(팀명: 이김손)
-![아이오터미널 웹사이트 디자인](https://raw.githubusercontent.com/2024-SMHRD-KDT-BigData-29/IoTerminal/main/image/IoTerminal2.png)
+
+![header](https://capsule-render.vercel.app/api?type=Venom&color=auto&height=300&section=header&text=IoTerminal%20&fontSize=90)
+
 
 
 ## 👀 서비스 소개
