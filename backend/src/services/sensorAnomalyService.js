@@ -459,6 +459,7 @@ class SensorAnomalyService {
             const {
                 sensor_type,
                 sensor_name,
+                sensor_location,
                 unit,
                 normal_min,
                 normal_max,
@@ -481,11 +482,12 @@ class SensorAnomalyService {
 
             const [result] = await db.query(
                 `INSERT INTO sensor_thresholds 
-                (sensor_type, sensor_name, unit, normal_min, normal_max, warning_min, warning_max, critical_min, critical_max, spike_threshold) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                (sensor_type, sensor_name, sensor_location, unit, normal_min, normal_max, warning_min, warning_max, critical_min, critical_max, spike_threshold) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     sensor_type,
                     sensor_name,
+                    sensor_location,
                     unit,
                     normal_min,
                     normal_max,
@@ -509,7 +511,7 @@ class SensorAnomalyService {
     async updateThreshold(sensorType, thresholdData) {
         try {
             const allowedFields = [
-                'normal_min', 'normal_max', 'warning_min', 'warning_max',
+                'sensor_location', 'normal_min', 'normal_max', 'warning_min', 'warning_max',
                 'critical_min', 'critical_max', 'spike_threshold', 'enabled'
             ];
 
