@@ -111,11 +111,10 @@
     <td align="center"><img src="https://pbs.twimg.com/media/B-n6uPYUUAAZSUx.png" width="100" height="100"/></td>
   </tr>
   <tr>
-    <td align="center"><strong>홍O동</strong></td>
-    <td align="center"><strong>홍O동</strong></td>
-    <td align="center"><strong>홍O동</strong></td>
-    <td align="center"><strong>홍O동</strong></td>
-    <td align="center"><strong>홍O동</strong></td>
+    <td align="center"><strong>김유진</strong></td>
+    <td align="center"><strong>김양선</strong></td>
+    <td align="center"><strong>이석구</strong></td>
+    <td align="center"><strong>손지수</strong></td>
   </tr>
   <tr>
     <td align="center"><b>Frontend</b></td>
