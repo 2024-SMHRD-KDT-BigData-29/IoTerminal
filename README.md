@@ -71,9 +71,9 @@
 
 | SW 유스케이스 | 서비스 흐름도 |
 |:---:|:---:|
-| <img src="./image/USECASE.png" width="400"/> | <img src="./image/service_flows.png" width="400"/> |
+| <img src="./image/USECASE.png"  width="500" height="350"/> | <img src="./image/service_flows.png"  width="500" height="350"/> |
 | **ER 다이어그램** | |
-| <img src="./image/ER_diagram.png" width="400"/> | |
+| <img src="./image/ER_diagram.png"  width="500" height="350"/> | |
 
 </div>
 
