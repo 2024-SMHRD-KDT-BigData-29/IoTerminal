@@ -108,7 +108,7 @@
 ## 🤾‍♂️ 트러블슈팅
 <div align="center">
 
-| ![트러블1](./image/trouble.png) | ![트러블2](./image/trouble2.png) |
+|<img src="./image/trouble.png"  width="500" height="350"/> | <img src="./image/trouble2.png"  width="500" height="350"/> |
 |:---:|:---:|
 
 </div>
