@@ -141,10 +141,10 @@
     <td align="center"><b>Frontend(sub)/<br>영상편집및제작</b></td>
   </tr>
   <tr>
-    <td align="center"><a href="https://github.com/자신의username작성해주세요" target='_blank'>github</a></td>
-    <td align="center"><a href="https://github.com/자신의username작성해주세요" target='_blank'>github</a></td>
+    <td align="center"><a href="https://github.com/kimyoojin811" target='_blank'>github</a></td>
+    <td align="center"><a href="https://github.com/yellow997" target='_blank'>github</a></td>
     <td align="center"><a href="https://github.com/LEESTONENINE" target='_blank'>github</a></td>
-    <td align="center"><a href="https://github.com/자신의username작성해주세요" target='_blank'>github</a></td>
+    <td align="center"><a href="https://github.com/sou327" target='_blank'>github</a></td>
   </tr>
 </table>
 
