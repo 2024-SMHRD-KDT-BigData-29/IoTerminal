@@ -84,11 +84,11 @@
 
 | 메인화면 | 대시보드 |
 |:---:|:---:|
-| <img src="./image/Main.png" width="400"/> | <img src="./image/Dashboard.png" width="400"/> |
+| <img src="./image/Main.png"  width="500" height="350"/> | <img src="./image/Dashboard.png" width="500" height="350"/> |
 | 워크플로우 | 센서 관리 |
-| <img src="./image/workflow.png" width="400"/> | <img src="./image/Sensor.png" width="400"/> |
+| <img src="./image/workflow.png"  width="500" height="350"/> | <img src="./image/Sensor.png"  width="500" height="350"/> |
 | IoT 디바이스 | 디바이스 상세 |
-| <img src="./image/IoTdevice.png" width="400"/> | <img src="./image/IoTdevice2.png" width="400"/> |
+| <img src="./image/IoTdevice.png"  width="500" height="350"/> | <img src="./image/IoTdevice2.png"  width="500" height="350"/> |
 
 </div>
 
