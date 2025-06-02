@@ -116,10 +116,10 @@
     <td align="center"><strong>손지수</strong></td>
   </tr>
   <tr>
-    <td align="center"><b>Frontend</b></td>
-    <td align="center"><b>Frontend</b></td>
-    <td align="center"><b>Backend</b></td>
-    <td align="center"><b>Backend</b></td>
+    <td align="center"><b>PM/산출문관리</b></td>
+    <td align="center"><b>BACK-END(SUB)/<br>DB 설계 및 연동</b></td>
+    <td align="center"><b>Backend/<br>Frontend</b></td>
+    <td align="center"><b>Frontend(sub)/<br>영상편집및제작</b></td>
   </tr>
   <tr>
     <td align="center"><a href="https://github.com/자신의username작성해주세요" target='_blank'>github</a></td>
